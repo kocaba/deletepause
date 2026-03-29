@@ -1,36 +1,58 @@
-const { createFFmpeg, fetchFile } = FFmpeg;
+// script.js
 
-const ffmpeg = createFFmpeg({
-  log: true,
-  corePath: "/ffmpeg/ffmpeg-core.js"
-});
+const { FFmpeg } = window.FFmpegWASM || {};
 
-let file;
+const ffmpeg = new FFmpeg();
 
-document.getElementById("uploader").addEventListener("change", (e) => {
-  file = e.target.files[0];
-});
+let loaded = false;
 
-async function start() {
-  if (!file) return alert("Upload file");
+async function loadFFmpeg() {
+  if (loaded) return;
 
-  if (!ffmpeg.isLoaded()) {
-    await ffmpeg.load();
+  console.log("Loading FFmpeg...");
+
+  await ffmpeg.load({
+    coreURL: "./ffmpeg/ffmpeg-core.js",
+    wasmURL: "./ffmpeg/ffmpeg-core.wasm",
+    workerURL: "./ffmpeg/ffmpeg-core.worker.js"
+  });
+
+  loaded = true;
+
+  console.log("FFmpeg loaded");
+}
+
+async function processVideo() {
+  const input = document.getElementById("fileInput").files[0];
+  if (!input) {
+    alert("Выбери файл");
+    return;
   }
 
-  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
+  await loadFFmpeg();
 
-  await ffmpeg.run(
+  const data = await input.arrayBuffer();
+
+  await ffmpeg.writeFile("input.mp4", new Uint8Array(data));
+
+  // ❗ ТУТ ТВОЯ ЛОГИКА УДАЛЕНИЯ ПАУЗ (пока просто копия)
+  await ffmpeg.exec([
     "-i", "input.mp4",
-    "-af", "silenceremove=1:0:-50dB",
+    "-c", "copy",
     "output.mp4"
-  );
+  ]);
 
-  const data = ffmpeg.FS("readFile", "output.mp4");
+  const output = await ffmpeg.readFile("output.mp4");
 
   const url = URL.createObjectURL(
-    new Blob([data.buffer], { type: "video/mp4" })
+    new Blob([output.buffer], { type: "video/mp4" })
   );
 
-  document.getElementById("preview").src = url;
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "output.mp4";
+  a.click();
 }
+
+// кнопка
+document.getElementById("processBtn").onclick = processVideo;
