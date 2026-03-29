@@ -1,6 +1,6 @@
 // script.js
 
-const { FFmpeg } = window.FFmpegWASM || {};
+const { FFmpeg } = FFmpeg;
 
 const ffmpeg = new FFmpeg();
 
