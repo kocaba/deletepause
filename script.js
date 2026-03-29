@@ -5,14 +5,13 @@ const ffmpeg = createFFmpeg({ log: true });
 let loaded = false;
 let logs = [];
 
-// логирование ffmpeg
 ffmpeg.setLogger(({ message }) => {
   logs.push(message);
 });
 
-// прогресс
 ffmpeg.setProgress(({ ratio }) => {
-  console.log("Progress:", Math.round(ratio * 100) + "%");
+  document.getElementById("progress").innerText =
+    "Processing: " + Math.round(ratio * 100) + "%";
 });
 
 async function loadFFmpeg() {
@@ -44,9 +43,7 @@ function parseSilence(logs) {
     const start = line.match(/silence_start: (\d+\.?\d*)/);
     const end = line.match(/silence_end: (\d+\.?\d*)/);
 
-    if (start) {
-      current = { start: parseFloat(start[1]) };
-    }
+    if (start) current = { start: parseFloat(start[1]) };
 
     if (end && current) {
       current.end = parseFloat(end[1]);
@@ -93,28 +90,11 @@ function buildSegments(silences, duration) {
 }
 
 // =====================
-// FILTER COMPLEX
-// =====================
-function buildFilter(segments) {
-  let filter = "";
-  let concat = "";
-
-  segments.forEach((seg, i) => {
-    filter += `[0:v]trim=start=${seg.start}:end=${seg.end},setpts=PTS-STARTPTS[v${i}];`;
-    filter += `[0:a]atrim=start=${seg.start}:end=${seg.end},asetpts=PTS-STARTPTS[a${i}];`;
-    concat += `[v${i}][a${i}]`;
-  });
-
-  filter += `${concat}concat=n=${segments.length}:v=1:a=1[outv][outa]`;
-
-  return filter;
-}
-
-// =====================
 // MAIN PROCESS
 // =====================
 document.getElementById("processBtn").onclick = async () => {
   const file = document.getElementById("fileInput").files[0];
+
   if (!file) {
     alert("Выбери файл");
     return;
@@ -151,17 +131,11 @@ document.getElementById("processBtn").onclick = async () => {
     return;
   }
 
-  // =====================
-  // 2. GET DURATION
-  // =====================
   const totalDuration = getDuration(logs);
 
-  // =====================
-  // 3. BUILD SEGMENTS
-  // =====================
   let segments = buildSegments(silences, totalDuration);
 
-  // небольшой padding (как в тиктоке)
+  // padding
   const PAD = 0.08;
 
   segments = segments.map(s => ({
@@ -175,24 +149,48 @@ document.getElementById("processBtn").onclick = async () => {
   }
 
   // =====================
-  // 4. BUILD FILTER
+  // 2. CUT PARTS
   // =====================
-  const filter = buildFilter(segments);
+  for (let i = 0; i < segments.length; i++) {
+    const s = segments[i];
+
+    await ffmpeg.run(
+      "-i", "input.mp4",
+      "-ss", String(s.start),
+      "-to", String(s.end),
+      "-c", "copy",
+      `part${i}.mp4`
+    );
+  }
 
   // =====================
-  // 5. RENDER
+  // 3. CONCAT LIST
+  // =====================
+  let concatList = "";
+
+  for (let i = 0; i < segments.length; i++) {
+    concatList += `file part${i}.mp4\n`;
+  }
+
+  ffmpeg.FS(
+    "writeFile",
+    "list.txt",
+    new TextEncoder().encode(concatList)
+  );
+
+  // =====================
+  // 4. MERGE
   // =====================
   await ffmpeg.run(
-    "-i", "input.mp4",
-    "-filter_complex", filter,
-    "-map", "[outv]",
-    "-map", "[outa]",
-    "-preset", "veryfast",
+    "-f", "concat",
+    "-safe", "0",
+    "-i", "list.txt",
+    "-c", "copy",
     "output.mp4"
   );
 
   // =====================
-  // 6. RESULT
+  // 5. RESULT
   // =====================
   const data = ffmpeg.FS("readFile", "output.mp4");
 
