@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pause Remover</title>
+</head>
+<body>
+
+<h2>Upload video</h2>
+<input type="file" id="uploader">
+
+<br><br>
+<button onclick="start()">Remove pauses</button>
+
+<video id="preview" controls width="400"></video>
+
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js"></script>
+<script src="script.js"></script>
+
+</body>
+</html>
