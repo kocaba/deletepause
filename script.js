@@ -21,20 +21,16 @@ async function loadFFmpeg() {
   }
 }
 
-// =====================
 // PREVIEW
-// =====================
 document.getElementById("fileInput").onchange = (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
-  const url = URL.createObjectURL(file);
-  document.getElementById("preview").src = url;
+  document.getElementById("preview").src =
+    URL.createObjectURL(file);
 };
 
-// =====================
 // PARSE SILENCE
-// =====================
 function parseSilence(logs) {
   const silences = [];
   let current = null;
@@ -55,9 +51,7 @@ function parseSilence(logs) {
   return silences;
 }
 
-// =====================
 // GET DURATION
-// =====================
 function getDuration(logs) {
   for (const line of logs) {
     const m = line.match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
@@ -68,9 +62,7 @@ function getDuration(logs) {
   return 0;
 }
 
-// =====================
 // BUILD SEGMENTS
-// =====================
 function buildSegments(silences, duration) {
   const segments = [];
   let prev = 0;
@@ -89,24 +81,11 @@ function buildSegments(silences, duration) {
   return segments;
 }
 
-// =====================
-// MAIN PROCESS
-// =====================
+// MAIN
 document.getElementById("processBtn").onclick = async () => {
   const file = document.getElementById("fileInput").files[0];
 
-  if (!file) {
-    alert("Выбери файл");
-    return;
-  }
-
-  if (file.size > 200 * 1024 * 1024) {
-    alert("Файл слишком большой (макс ~200MB)");
-    return;
-  }
-
-  const duration = document.getElementById("duration").value;
-  const threshold = document.getElementById("threshold").value;
+  if (!file) return alert("Выбери файл");
 
   await loadFFmpeg();
 
@@ -114,9 +93,10 @@ document.getElementById("processBtn").onclick = async () => {
 
   ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
-  // =====================
-  // 1. DETECT SILENCE
-  // =====================
+  const duration = document.getElementById("duration").value;
+  const threshold = document.getElementById("threshold").value;
+
+  // 1. DETECT
   await ffmpeg.run(
     "-i", "input.mp4",
     "-af", `silencedetect=noise=${threshold}dB:d=${duration}`,
@@ -143,28 +123,24 @@ document.getElementById("processBtn").onclick = async () => {
     end: s.end + PAD
   }));
 
-  if (segments.length > 100) {
-    alert("Слишком много сегментов");
-    return;
-  }
-
   // =====================
-  // 2. CUT PARTS
+  // CUT FILES
   // =====================
   for (let i = 0; i < segments.length; i++) {
     const s = segments[i];
 
     await ffmpeg.run(
-      "-i", "input.mp4",
       "-ss", String(s.start),
       "-to", String(s.end),
-      "-c", "copy",
+      "-i", "input.mp4",
+      "-c:v", "libx264",
+      "-c:a", "aac",
       `part${i}.mp4`
     );
   }
 
   // =====================
-  // 3. CONCAT LIST
+  // CONCAT LIST
   // =====================
   let concatList = "";
 
@@ -179,29 +155,27 @@ document.getElementById("processBtn").onclick = async () => {
   );
 
   // =====================
-  // 4. MERGE
+  // MERGE
   // =====================
   await ffmpeg.run(
     "-f", "concat",
     "-safe", "0",
     "-i", "list.txt",
-    "-c", "copy",
+    "-c:v", "libx264",
+    "-c:a", "aac",
     "output.mp4"
   );
 
-  // =====================
-  // 5. RESULT
-  // =====================
+  // RESULT
   const data = ffmpeg.FS("readFile", "output.mp4");
 
   const url = URL.createObjectURL(
     new Blob([data.buffer], { type: "video/mp4" })
   );
 
-  const video = document.getElementById("preview");
-  video.src = url;
+  document.getElementById("preview").src = url;
 
-  const downloadBtn = document.getElementById("downloadBtn");
-  downloadBtn.href = url;
-  downloadBtn.style.display = "inline";
+  const btn = document.getElementById("downloadBtn");
+  btn.href = url;
+  btn.style.display = "inline";
 };
