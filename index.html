@@ -3,39 +3,71 @@
 <head>
   <meta charset="UTF-8">
   <title>Pause Remover</title>
+
+  <style>
+    body {
+      font-family: Arial;
+      max-width: 600px;
+      margin: 40px auto;
+    }
+
+    video {
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    input, button {
+      margin-top: 10px;
+      width: 100%;
+      padding: 8px;
+    }
+
+    #progress {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+
+    #downloadBtn {
+      display: none;
+      margin-top: 10px;
+      display: inline-block;
+      padding: 10px;
+      background: black;
+      color: white;
+      text-decoration: none;
+    }
+  </style>
 </head>
 <body>
 
-<h2>Upload video</h2>
+<h2>Remove pauses from video</h2>
 
-<input type="file" id="fileInput">
+<!-- FILE -->
+<input type="file" id="fileInput" accept="video/*">
 
-<br><br>
-
+<!-- SETTINGS -->
 <label>Минимальная тишина (сек):</label>
 <input type="number" id="duration" value="0.5" step="0.1">
 
-<br><br>
-
 <label>Чувствительность (dB):</label>
-<input type="number" id="threshold" value="-40">
+<input type="number" id="threshold" value="-35">
 
-<br><br>
+<!-- BUTTON -->
+<button id="processBtn">Обработать видео</button>
 
-<button id="processBtn">Remove pauses</button>
+<!-- PROGRESS -->
+<div id="progress"></div>
 
-<br><br>
+<!-- VIDEO -->
+<video id="preview" controls></video>
 
-<video id="preview" controls width="400"></video>
-
-<br><br>
-
-<a id="downloadBtn" style="display:none;" download="output.mp4">Скачать видео</a>
+<!-- DOWNLOAD -->
+<a id="downloadBtn" download="output.mp4">Скачать видео</a>
 
 <!-- FFmpeg -->
 <script src="./ffmpeg/ffmpeg.min.js"></script>
 
-<!-- твой код -->
+<!-- SCRIPT -->
 <script src="script.js"></script>
 
 </body>
