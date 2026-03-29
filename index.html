@@ -7,15 +7,22 @@
 <body>
 
 <h2>Upload video</h2>
-<input type="file" id="uploader">
+
+<input type="file" id="fileInput">
 
 <br><br>
-<button onclick="start()">Remove pauses</button>
+
+<button id="processBtn">Remove pauses</button>
+
+<br><br>
 
 <video id="preview" controls width="400"></video>
 
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js"></script>
+<!-- ЛОКАЛЬНАЯ библиотека -->
+<script src="./ffmpeg/ffmpeg.min.js"></script>
+
+<!-- ТВОЙ СКРИПТ -->
 <script src="script.js"></script>
 
 </body>
-</html> 
+</html>
