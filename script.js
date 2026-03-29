@@ -1,48 +1,44 @@
-// script.js
+const { createFFmpeg, fetchFile } = FFmpeg;
 
-let ffmpeg;
+const ffmpeg = createFFmpeg({ log: true });
+
 let loaded = false;
 
 async function loadFFmpeg() {
-  if (loaded) return;
-
-  console.log("Loading FFmpeg...");
-
-  // ждём пока библиотека появится
-  while (typeof FFmpeg === "undefined") {
-    await new Promise(r => setTimeout(r, 100));
+  if (!loaded) {
+    await ffmpeg.load();
+    loaded = true;
   }
-
-  const { createFFmpeg, fetchFile } = FFmpeg;
-
-  ffmpeg = createFFmpeg({
-    log: true,
-    corePath: "./ffmpeg/ffmpeg-core.js"
-  });
-
-  await ffmpeg.load();
-
-  loaded = true;
-
-  console.log("FFmpeg loaded");
 }
 
-async function processVideo() {
-  const input = document.getElementById("fileInput").files[0];
-  if (!input) {
+// превью исходного видео
+document.getElementById("fileInput").onchange = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const url = URL.createObjectURL(file);
+  document.getElementById("preview").src = url;
+};
+
+document.getElementById("processBtn").onclick = async () => {
+  const file = document.getElementById("fileInput").files[0];
+  if (!file) {
     alert("Выбери файл");
     return;
   }
 
+  const duration = document.getElementById("duration").value;
+  const threshold = document.getElementById("threshold").value;
+
   await loadFFmpeg();
 
-  const { fetchFile } = FFmpeg;
+  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
-  await ffmpeg.FS("writeFile", "input.mp4", await fetchFile(input));
-
+  // 🔥 удаление тишины
   await ffmpeg.run(
     "-i", "input.mp4",
-    "-c", "copy",
+    "-af", `silenceremove=stop_periods=-1:stop_duration=${duration}:stop_threshold=${threshold}dB`,
+    "-c:v", "copy",
     "output.mp4"
   );
 
@@ -52,10 +48,12 @@ async function processVideo() {
     new Blob([data.buffer], { type: "video/mp4" })
   );
 
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "output.mp4";
-  a.click();
-}
+  // показать результат в плеере
+  const video = document.getElementById("preview");
+  video.src = url;
 
-document.getElementById("processBtn").onclick = processVideo;
+  // показать кнопку скачать
+  const downloadBtn = document.getElementById("downloadBtn");
+  downloadBtn.href = url;
+  downloadBtn.style.display = "inline";
+};
