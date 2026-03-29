@@ -1,18 +1,24 @@
 // script.js
 
-const { createFFmpeg, fetchFile } = FFmpeg;
-
-const ffmpeg = createFFmpeg({
-  log: true,
-  corePath: "./ffmpeg/ffmpeg-core.js"
-});
-
+let ffmpeg;
 let loaded = false;
 
 async function loadFFmpeg() {
   if (loaded) return;
 
   console.log("Loading FFmpeg...");
+
+  // ждём пока библиотека появится
+  while (typeof FFmpeg === "undefined") {
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  const { createFFmpeg, fetchFile } = FFmpeg;
+
+  ffmpeg = createFFmpeg({
+    log: true,
+    corePath: "./ffmpeg/ffmpeg-core.js"
+  });
 
   await ffmpeg.load();
 
@@ -29,6 +35,8 @@ async function processVideo() {
   }
 
   await loadFFmpeg();
+
+  const { fetchFile } = FFmpeg;
 
   await ffmpeg.FS("writeFile", "input.mp4", await fetchFile(input));
 
