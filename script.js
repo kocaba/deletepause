@@ -1,8 +1,11 @@
 // script.js
 
-const { FFmpeg } = FFmpeg;
+const { createFFmpeg, fetchFile } = FFmpeg;
 
-const ffmpeg = new FFmpeg();
+const ffmpeg = createFFmpeg({
+  log: true,
+  corePath: "./ffmpeg/ffmpeg-core.js"
+});
 
 let loaded = false;
 
@@ -11,11 +14,7 @@ async function loadFFmpeg() {
 
   console.log("Loading FFmpeg...");
 
-  await ffmpeg.load({
-    coreURL: "./ffmpeg/ffmpeg-core.js",
-    wasmURL: "./ffmpeg/ffmpeg-core.wasm",
-    workerURL: "./ffmpeg/ffmpeg-core.worker.js"
-  });
+  await ffmpeg.load();
 
   loaded = true;
 
@@ -31,21 +30,18 @@ async function processVideo() {
 
   await loadFFmpeg();
 
-  const data = await input.arrayBuffer();
+  await ffmpeg.FS("writeFile", "input.mp4", await fetchFile(input));
 
-  await ffmpeg.writeFile("input.mp4", new Uint8Array(data));
-
-  // ❗ ТУТ ТВОЯ ЛОГИКА УДАЛЕНИЯ ПАУЗ (пока просто копия)
-  await ffmpeg.exec([
+  await ffmpeg.run(
     "-i", "input.mp4",
     "-c", "copy",
     "output.mp4"
-  ]);
+  );
 
-  const output = await ffmpeg.readFile("output.mp4");
+  const data = ffmpeg.FS("readFile", "output.mp4");
 
   const url = URL.createObjectURL(
-    new Blob([output.buffer], { type: "video/mp4" })
+    new Blob([data.buffer], { type: "video/mp4" })
   );
 
   const a = document.createElement("a");
@@ -54,5 +50,4 @@ async function processVideo() {
   a.click();
 }
 
-// кнопка
 document.getElementById("processBtn").onclick = processVideo;
