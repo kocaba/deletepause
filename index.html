@@ -3,26 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pause Remover Pro</title>
+  <title>Pause Remover Pro — Розумний монтаж</title>
   <style>
     :root {
       --primary: #2b6cff;
-      --accent: #ff8c00; /* Оранжевий для кнопки */
-      --glass: rgba(255, 255, 255, 0.96);
+      --accent: #00d2ff;
+      --success: #00b894;
+      --glass: rgba(255, 255, 255, 0.95);
+      --text-main: #1a202c;
     }
 
     * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
       background: linear-gradient(-45deg, #020617, #0f172a, #1e3a8a, #2563eb);
       background-size: 400% 400%;
       animation: gradientBG 10s ease infinite;
-      color: #1a202c;
-      display: flex;
-      flex-direction: column;
+      color: var(--text-main);
+      overflow-x: hidden;
     }
 
     @keyframes gradientBG {
@@ -31,16 +34,12 @@
       100% { background-position: 0% 50%; }
     }
 
-    header { padding: 30px 20px; text-align: center; color: white; }
-    header h1 { margin: 0; font-size: 28px; letter-spacing: 1px; }
+    header { padding: 50px 20px 30px; text-align: center; color: white; }
+    header h1 { margin: 0; font-size: 36px; font-weight: 800; text-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+    
+    .description { max-width: 600px; margin: 15px auto 0; font-size: 16px; opacity: 0.85; line-height: 1.6; }
 
-    .app-container {
-      flex: 1;
-      width: 100%;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 0 20px 40px;
-    }
+    .app-wrapper { flex: 1; width: 100%; max-width: 650px; margin: 0 auto; padding: 0 20px 50px; }
 
     .card {
       background: var(--glass);
@@ -48,247 +47,197 @@
       border-radius: 24px;
       padding: 25px;
       margin-bottom: 20px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
-    /* Блок завантаження та відео */
-    .upload-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 20px;
-      min-height: 150px;
-      align-items: center;
+    h2 { margin: 0 0 20px; font-size: 20px; color: var(--primary); text-align: center; }
+
+    .file-drop-area {
+      border: 2px dashed #cbd5e1;
+      border-radius: 16px;
+      padding: 40px 20px;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.5);
       cursor: pointer;
     }
 
-    .file-info-side { flex: 1; min-width: 140px; text-align: center; }
-    .video-preview-side { flex: 1; min-width: 280px; }
+    .tabs { display: flex; background: #f1f5f9; border-radius: 12px; padding: 4px; margin-bottom: 20px; }
+    .tabs > div { flex: 1; text-align: center; padding: 10px; cursor: pointer; border-radius: 10px; font-weight: 700; font-size: 14px; }
+
+    label { font-size: 14px; font-weight: 700; display: block; margin-top: 15px; color: #475569; }
+    input[type="range"] { width: 100%; margin-top: 10px; accent-color: var(--primary); }
+
+    .progress-container { margin: 25px 0; padding: 20px; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; }
+    .progress-bg { width: 100%; background: #e2e8f0; height: 12px; border-radius: 6px; overflow: hidden; }
+    #progressBar { width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease; }
+    #statusText { text-align: center; font-weight: 800; margin-bottom: 10px; color: var(--primary); }
+
+    button {
+      width: 100%; padding: 18px; border: none; border-radius: 16px;
+      background: var(--primary); color: white; font-size: 16px; font-weight: 800; cursor: pointer;
+    }
+
+    /* Відео контейнер та стилі */
+    #waveform { width: 100%; height: 120px; background: #000; border-radius: 12px; margin-top: 10px; }
     
-    .video-preview-side video {
-      width: 100%;
-      border-radius: 12px;
-      background: #000;
+    /* Контейнер для центрування відео */
+    .video-container { display: flex; flex-direction: column; align-items: center; }
+
+    video { 
+      width: 40%; /* Початкова ширина 40% */
+      max-width: 100%;
+      border-radius: 16px; 
+      background: #000; 
+      margin: 10px auto; 
       display: block;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      transition: width 0.5s ease; /* Плавно розширюється */
     }
 
-    .drop-zone {
+    /* Клас, який додасть твій script.js після обробки */
+    video.processed {
       width: 100%;
-      border: 2px dashed #cbd5e1;
-      border-radius: 16px;
-      padding: 40px;
-      text-align: center;
-      transition: 0.3s;
     }
-    .drop-zone:hover { border-color: var(--primary); background: rgba(255,255,255,0.8); }
-
-    /* Таби та налаштування */
-    .tabs {
-      display: flex;
-      background: #f1f5f9;
-      border-radius: 12px;
-      padding: 4px;
-      margin-bottom: 20px;
-    }
-    .tabs div {
-      flex: 1; text-align: center; padding: 12px; cursor: pointer;
-      border-radius: 10px; font-weight: bold; transition: 0.3s;
-    }
-
-    label { font-size: 13px; font-weight: 700; margin-top: 15px; display: block; color: #475569; }
-    input[type="range"] { width: 100%; accent-color: var(--primary); }
-
-    #autoInfo {
-      padding: 15px;
-      background: #eef2ff;
-      border-radius: 12px;
-      font-size: 14px;
-      border-left: 4px solid var(--primary);
+    
+    /* Блок кнопок після обробки */
+    .action-buttons {
+      display: none; /* Сховано спочатку */
+      width: 100%;
+      gap: 10px;
       margin-bottom: 15px;
     }
 
-    /* Звукова доріжка */
-    #waveform {
-      width: 100%;
-      height: 100px;
-      background: #000;
-      border-radius: 12px;
-      margin: 15px 0;
-    }
-
-    /* Прогрес */
-    .progress-bar-minimal {
-      height: 8px;
-      background: #e2e8f0;
-      border-radius: 4px;
-      overflow: hidden;
-      margin-bottom: 10px;
-      display: none; /* Показуємо тільки при обробці */
-    }
-    #progressBar { height: 100%; width: 0; background: var(--primary); transition: 0.3s; }
-
-    /* Кнопка з анімацією */
-    #processBtn {
-      width: 100%;
-      padding: 20px;
-      border: none;
-      border-radius: 16px;
-      background: linear-gradient(45deg, #ff8c00, #ff4500, #ff8c00);
-      background-size: 200% auto;
-      color: white;
-      font-size: 18px;
-      font-weight: 800;
-      cursor: pointer;
-      box-shadow: 0 10px 20px rgba(255, 140, 0, 0.3);
-      animation: shine 3s linear infinite, pulse 2s infinite;
-    }
-
-    @keyframes shine { to { background-position: 200% center; } }
-    @keyframes pulse {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.02); }
-      100% { transform: scale(1); }
-    }
-
-    #processBtn:disabled {
-      background: #cbd5e1;
-      animation: none;
-      box-shadow: none;
-      cursor: not-allowed;
-    }
-
     #downloadBtn {
-      display: none;
-      width: 100%;
-      padding: 18px;
+      flex: 2;
       background: var(--success);
       color: white;
       text-align: center;
       text-decoration: none;
-      border-radius: 16px;
-      font-weight: bold;
-      margin-top: 15px;
+      padding: 15px;
+      border-radius: 12px;
+      font-weight: 800;
     }
 
-    .hidden { display: none !important; }
-    
-    footer { padding: 30px; text-align: center; color: white; opacity: 0.6; font-size: 12px; }
-
-    @media (max-width: 600px) {
-      .file-info-side { flex: 0 0 100%; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
-      .video-preview-side { flex: 0 0 100%; }
+    #resetBtn {
+      flex: 1;
+      background: #64748b;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 700;
     }
+
+    .hidden-initially { display: none; }
+
+    footer { padding: 30px; text-align: center; color: rgba(255,255,255,0.6); font-size: 13px; }
   </style>
 </head>
 <body>
 
 <header>
   <h1>Pause Remover Pro</h1>
+  <p class="description">Розумний інструмент для автоматичного вирізання тиші.</p>
 </header>
 
-<div class="app-container">
+<div class="app-wrapper">
   
-  <div class="card" id="step1Card">
-    <div class="upload-container" id="mainUploadArea" onclick="document.getElementById('fileInput').click()">
-      
-      <div id="beforeUpload" class="drop-zone">
-        <span style="font-size: 40px;">📁</span>
-        <p><b>Натисніть або перетягніть відео сюди</b></p>
-        <input type="file" id="fileInput" accept="video/*" class="hidden">
-      </div>
-
-      <div id="afterUpload" class="hidden" style="display:contents">
-        <div class="file-info-side">
-          <p style="color:var(--primary); font-weight:bold">Вибрано файл:</p>
-          <p id="fileNameDisplay" style="word-break:break-all; font-size:14px">video.mp4</p>
-          <p style="font-size:12px; color:#666">Натисніть, щоб змінити</p>
-        </div>
-        <div class="video-preview-side">
-          <video id="preview" controls></video>
-        </div>
-      </div>
-
+  <div class="card">
+    <h2>📂 Крок 1: Завантаження</h2>
+    <div class="file-drop-area" onclick="document.getElementById('fileInput').click()">
+      <input type="file" id="fileInput" accept="video/*" style="display:none">
+      <p style="margin: 0; font-size: 14px; color: #64748b;">Натисніть сюди, щоб обрати файл</p>
     </div>
   </div>
 
-  <div id="settingsArea" class="card hidden">
+  <div id="settingsCard" class="card hidden-initially">
+    <h2>⚙️ Крок 2: Налаштування</h2>
     <div class="tabs">
-      <div id="tabAuto" style="background:var(--primary); color:white">Авто</div>
+      <div id="tabAuto" style="background: var(--primary); color: white;">Авто</div>
       <div id="tabManual">Вручну</div>
     </div>
-
-    <div id="autoInfo">
-      ✨ <b>Розумний аналіз:</b> Ми автоматично визначимо порог тиші та видалимо непотрібні паузи.
-    </div>
-
-    <div id="manualControls" class="hidden">
+    <div id="manualControls" style="display: none;">
       <label>Мінімальна тиша</label>
       <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
-      <div class="slider-info"><span>Короткі</span><span id="durationVal">0.5с</span></div>
-
-      <label>Чутливість (dB)</label>
-      <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
-      <div class="slider-info"><span>Тише</span><span id="thresholdVal">-35 dB</span></div>
     </div>
-
-    <canvas id="waveform"></canvas>
-
-    <div id="progCont" class="hidden">
-      <div id="statusText" style="font-size:12px; margin-bottom:5px; text-align:center">Обробка...</div>
-      <div class="progress-bar-minimal" style="display:block">
-        <div id="progressBar"></div>
-      </div>
-      <div id="etaText" style="font-size:11px; text-align:center; color:#666">Залишилось: --</div>
+    <div id="autoInfo" style="padding: 15px; font-size: 14px; background: #eef2ff; border-radius: 12px; margin-bottom: 15px;">
+      ✨ Режим Авто підбере налаштування сам.
     </div>
-
+    <div class="progress-container" id="progCont">
+      <div id="statusText">Готово</div>
+      <div class="progress-bg"><div id="progressBar"></div></div>
+    </div>
     <button id="processBtn">ЗАПУСТИТИ ОБРОБКУ</button>
-    <a id="downloadBtn" download="no_pauses.mp4">📥 ЗАВАНТАЖИТИ РЕЗУЛЬТАТ</a>
+  </div>
+
+  <div id="waveformCard" class="card hidden-initially">
+    <h2>📊 Аналіз звуку</h2>
+    <canvas id="waveform"></canvas>
+  </div>
+
+  <div id="resultCard" class="card hidden-initially">
+    <h2>🎬 Результат</h2>
+    
+    <div id="actionButtons" class="action-buttons">
+        <a id="downloadBtn" download="no_pauses.mp4">📥 СКАЧАТИ</a>
+        <button id="resetBtn" onclick="location.reload()">🔄 НОВЕ ВІДЕО</button>
+    </div>
+
+    <div class="video-container">
+        <video id="preview" controls></video>
+    </div>
   </div>
 
 </div>
 
 <footer>
-  Обробка відбувається локально у вашому браузері за допомогою FFmpeg.wasm
+  <p>© 2024 AI Video Tools Lab</p>
 </footer>
 
 <script>
   const fileInput = document.getElementById('fileInput');
-  const beforeUpload = document.getElementById('beforeUpload');
-  const afterUpload = document.getElementById('afterUpload');
-  const settingsArea = document.getElementById('settingsArea');
-  const fileNameDisplay = document.getElementById('fileNameDisplay');
+  const settingsCard = document.getElementById('settingsCard');
+  const waveformCard = document.getElementById('waveformCard');
+  const resultCard = document.getElementById('resultCard');
+  const preview = document.getElementById('preview');
+  const actionButtons = document.getElementById('actionButtons');
+  const downloadBtn = document.getElementById('downloadBtn');
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) {
+      settingsCard.style.display = 'block';
+      waveformCard.style.display = 'block';
+      resultCard.style.display = 'block';
+      
+      // Скидаємо ширину до 40%, якщо завантажуємо новий файл
+      preview.classList.remove('processed');
+      actionButtons.style.display = 'none';
+    }
+  });
+
+  // ЦЯ ЧАСТИНА ДЛЯ ТЕБЕ:
+  // У твоєму script.js, там де обробка FFmpeg завершується (фінальний етап),
+  // тобі треба додати ці два рядки:
+  // document.getElementById('preview').classList.add('processed');
+  // document.getElementById('actionButtons').style.display = 'flex';
+  // document.getElementById('downloadBtn').style.display = 'block';
+
   const tAuto = document.getElementById('tabAuto');
   const tManual = document.getElementById('tabManual');
   const mControls = document.getElementById('manualControls');
   const aInfo = document.getElementById('autoInfo');
-  const processBtn = document.getElementById('processBtn');
-  const progCont = document.getElementById('progCont');
 
-  // Коли файл обрано
-  fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-      beforeUpload.classList.add('hidden');
-      afterUpload.classList.remove('hidden');
-      settingsArea.classList.remove('hidden');
-      fileNameDisplay.innerText = e.target.files[0].name;
-    }
-  });
-
-  // Перемикання табів
   tAuto.onclick = () => {
     tAuto.style.background = 'var(--primary)'; tAuto.style.color = 'white';
     tManual.style.background = 'none'; tManual.style.color = 'inherit';
-    mControls.classList.add('hidden'); aInfo.classList.remove('hidden');
+    mControls.style.display = 'none'; aInfo.style.display = 'block';
   };
   tManual.onclick = () => {
     tManual.style.background = 'var(--primary)'; tManual.style.color = 'white';
     tAuto.style.background = 'none'; tAuto.style.color = 'inherit';
-    mControls.classList.remove('hidden'); aInfo.classList.add('hidden');
+    mControls.style.display = 'block'; aInfo.style.display = 'none';
   };
-
-  // При натисканні на "Запустити"
-  processBtn.addEventListener('click', () => {
-    progCont.classList.remove('hidden');
-  });
 </script>
 
 <script src="./ffmpeg/ffmpeg.min.js"></script>
