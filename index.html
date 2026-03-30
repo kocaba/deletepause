@@ -2,207 +2,69 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pause Remover Pro</title>
   <style>
-    :root {
-      --primary: #0052ff;
-      --accent: #00d2ff;
-      --success: #00c853;
-      --glass: rgba(255, 255, 255, 0.9);
-    }
+    :root { --primary: #2b6cff; --success: #00b894; --bg: #f5f9ff; }
+    body { margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); display: flex; justify-content: center; color: #333; }
+    .app { width: 100%; max-width: 600px; padding: 20px; }
+    .card { background: white; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+    h2 { text-align: center; margin-top: 0; color: var(--primary); }
+    input[type="file"] { width: 100%; padding: 10px; border: 1px dashed #ccc; border-radius: 10px; cursor: pointer; box-sizing: border-box; }
+    label { font-size: 14px; margin-top: 15px; display: block; font-weight: bold; }
+    .slider-info { display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-top: 4px; }
+    input[type="range"] { width: 100%; margin-top: 8px; cursor: pointer; }
+    
+    /* Progress Bar Styles */
+    .progress-container { margin: 20px 0; display: none; }
+    .progress-bg { width: 100%; background: #eee; height: 12px; border-radius: 6px; overflow: hidden; }
+    #progressBar { width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease; }
+    #statusText { text-align: center; font-weight: bold; margin-bottom: 5px; font-size: 15px; }
+    #etaText { text-align: center; font-size: 12px; color: #888; margin-top: 5px; }
 
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      height: 100vh;
-      height: 100svh; /* Для мобильных */
-      display: flex;
-      flex-direction: column;
-      /* Насыщенный синий градиент */
-      background: linear-gradient(-45deg, #00227b, #0052ff, #00d2ff, #74b9ff);
-      background-size: 300% 300%;
-      animation: gradientBG 8s ease infinite;
-      overflow: hidden; /* Запрет скролла на старте */
-    }
-
-    @keyframes gradientBG {
-      0% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-      100% { background-position: 0% 50%; }
-    }
-
-    header {
-      padding: 15px;
-      text-align: center;
-      background: rgba(255, 255, 255, 0.15);
-      backdrop-filter: blur(10px);
-      color: white;
-    }
-
-    header h1 { margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 2px; }
-
-    .main-container {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 15px;
-      overflow-y: auto; /* Скролл появится только если контент не влезет */
-    }
-
-    .app-card {
-      background: var(--glass);
-      backdrop-filter: blur(20px);
-      border-radius: 30px;
-      padding: 25px;
-      width: 100%;
-      max-width: 450px;
-      box-shadow: 0 25px 50px rgba(0,0,0,0.2);
-      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    /* Когда файл загружен, расширяем для десктопа */
-    @media (min-width: 900px) {
-      .app-card.expanded {
-        max-width: 950px;
-        flex-direction: row;
-      }
-      .app-card.expanded .controls-section { flex: 1; }
-      .app-card.expanded .video-section { flex: 1; }
-    }
-
-    .hidden { display: none !important; }
-
-    .upload-box {
-      border: 3px dashed var(--primary);
-      border-radius: 20px;
-      padding: 50px 20px;
-      text-align: center;
-      cursor: pointer;
-      background: rgba(0, 82, 255, 0.05);
-      transition: 0.3s;
-    }
-
-    .upload-box:hover { background: rgba(0, 82, 255, 0.1); border-color: var(--accent); }
-
-    .tabs { display: flex; background: #eee; border-radius: 12px; padding: 4px; }
-    .tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; border-radius: 10px; font-weight: bold; font-size: 14px; }
-    .tab.active { background: var(--primary); color: white; }
-
-    button {
-      padding: 18px;
-      border: none;
-      border-radius: 15px;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 16px;
-      background: var(--primary);
-      color: white;
-      box-shadow: 0 5px 15px rgba(0, 82, 255, 0.3);
-    }
-
-    .video-section {
-      background: #000;
-      border-radius: 20px;
-      overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    @media (max-width: 768px) {
-        body.file-loaded { overflow-y: auto; } /* Разрешаем скролл после загрузки */
-        .video-section video { width: 80% !important; margin: 10px auto; }
-    }
-
-    /* Overlay */
-    #overlay {
-      position: fixed;
-      top:0; left:0; width:100%; height:100%;
-      background: rgba(0,10,30,0.9);
-      display:none; flex-direction:column; align-items:center; justify-content:center;
-      z-index:9999; color:white; backdrop-filter: blur(10px);
-    }
-
-    .loader {
-      width: 50px; height: 50px;
-      border: 5px solid rgba(255,255,255,0.1);
-      border-top: 5px solid var(--accent);
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .progress-bar-wrap { width: 200px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin: 20px 0; overflow: hidden; }
-    #overlayBar { width: 0%; height: 100%; background: var(--accent); }
-
-    footer {
-      padding: 15px;
-      text-align: center;
-      background: rgba(255,255,255,0.1);
-      color: rgba(255,255,255,0.7);
-      font-size: 12px;
-    }
-    footer a { color: white; text-decoration: none; margin: 0 10px; }
+    button { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--primary); color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    
+    #waveform { width: 100%; height: 120px; background: #fafafa; border-radius: 10px; border: 1px solid #eee; display: block; }
+    video { width: 100%; border-radius: 12px; margin-top: 10px; background: #000; }
+    #downloadBtn { display: none; margin-top: 12px; text-align: center; padding: 15px; background: var(--success); color: white; text-decoration: none; border-radius: 12px; font-weight: bold; }
   </style>
 </head>
 <body>
 
-<header>
-  <h1>Pause Remover</h1>
-</header>
+<div class="app">
+  <div class="card">
+    <h2>Remove Pauses</h2>
+    <input type="file" id="fileInput" accept="video/*">
+  </div>
 
-<div class="main-container">
-  <div class="app-card" id="appCard">
-    <div class="controls-section" id="controls">
-      <div id="stepUpload" class="upload-box" onclick="document.getElementById('fileInput').click()">
-        <input type="file" id="fileInput" accept="video/*" style="display:none">
-        <div style="font-size: 40px; margin-bottom: 10px;">💙</div>
-        <strong>Нажмите сюда</strong>
-        <p style="font-size: 13px; opacity: 0.6;">чтобы загрузить видео</p>
-      </div>
+  <div class="card">
+    <label>Минимальная тишина</label>
+    <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
+    <div class="slider-info"><span>Короткие паузы</span><span id="durationVal">0.5 сек</span></div>
 
-      <div id="stepSettings" class="hidden">
-        <div class="tabs">
-          <div id="tabAuto" class="tab active" onclick="setMode('auto')">Авто</div>
-          <div id="tabManual" class="tab" onclick="setMode('manual')">Вручную</div>
-        </div>
-        <div id="manualPanel" class="hidden" style="margin-top:15px">
-            <input type="range" id="duration" min="0.1" max="2.0" step="0.1" value="0.5" style="width:100%">
-            <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35" style="width:100%">
-        </div>
-        <canvas id="waveform" style="width:100%; height:60px; background:#f0f0f0; border-radius:10px; margin:10px 0;"></canvas>
-        <button id="processBtn" style="width:100%">ОБРАБОТАТЬ</button>
-      </div>
+    <label>Чувствительность (dB)</label>
+    <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
+    <div class="slider-info"><span>Тише</span><span id="thresholdVal">-35 dB</span></div>
 
-      <div id="stepDone" class="hidden" style="text-align:center">
-        <h2>Готово! ✨</h2>
-        <a id="downloadBtn" download="video.mp4" style="display:block; background:var(--success); color:white; padding:18px; border-radius:15px; text-decoration:none; font-weight:bold; margin-bottom:10px;">СКАЧАТЬ ВИДЕО</a>
-        <button onclick="location.reload()" style="background:none; color:var(--primary); border:1px solid">Новое видео</button>
-      </div>
+    <div class="progress-container" id="progCont">
+      <div id="statusText">Ожидание...</div>
+      <div class="progress-bg"><div id="progressBar"></div></div>
+      <div id="etaText">Осталось: -- сек</div>
     </div>
 
-    <div id="videoSection" class="video-section hidden"></div>
+    <button id="processBtn">Запустить обработку</button>
+  </div>
+
+  <div class="card">
+    <canvas id="waveform"></canvas>
+  </div>
+
+  <div class="card">
+    <video id="preview" controls></video>
+    <a id="downloadBtn" download="no_pauses.mp4">Скачать готовое видео</a>
   </div>
 </div>
-
-<div id="overlay">
-  <div class="loader"></div>
-  <h3 id="status">Обработка...</h3>
-  <div class="progress-bar-wrap"><div id="overlayBar"></div></div>
-  <div id="percent">0%</div>
-  <div id="eta" style="font-size:12px; margin-top:10px; opacity:0.6">Осталось: --</div>
-</div>
-
-<footer>
-  <a href="#">Инструкция</a> | <a href="#">Помощь</a> | <a href="#">О проекте</a>
-</footer>
 
 <script src="./ffmpeg/ffmpeg.min.js"></script>
 <script src="script.js"></script>
