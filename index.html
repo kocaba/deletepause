@@ -7,68 +7,57 @@
   <style>
     :root { --primary: #2b6cff; --success: #00b894; --bg: #000; }
     
-    * { box-sizing: border-box; } /* Виправляє вилізання рамок */
+    * { box-sizing: border-box; } /* Це виправляє вилізання рамок */
 
     body { 
       margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); 
       display: flex; justify-content: center; color: #333; min-height: 100vh;
-      overflow-x: hidden;
     }
 
-    /* Анімований фон */
     .bg-circle {
       position: fixed; width: 600px; height: 600px;
       background: radial-gradient(circle, #1e3a8a 0%, rgba(0,0,0,0) 70%);
       border-radius: 50%; filter: blur(80px); z-index: -1;
-      animation: move 12s infinite alternate ease-in-out;
+      top: 10%; left: -10%;
     }
-    @keyframes move { from { transform: translate(-20%, 10%); } to { transform: translate(70%, 60%); } }
 
     .app { width: 100%; max-width: 600px; padding: 20px; z-index: 1; }
     
     .card { 
-      background: rgba(255, 255, 255, 0.95); border-radius: 20px; padding: 20px; 
-      margin-bottom: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-      width: 100%;
+      background: rgba(255, 255, 255, 0.98); border-radius: 20px; padding: 20px; 
+      margin-bottom: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
     }
 
     h2 { text-align: center; margin-top: 0; color: var(--primary); }
-
-    /* Оверлей на весь екран */
-    #fullOverlay {
-      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.95); z-index: 9999; flex-direction: column;
-      justify-content: center; align-items: center; color: white; text-align: center;
-    }
-
+    
+    /* Поле вибору файлу */
     input[type="file"] { 
       width: 100%; padding: 15px; border: 2px dashed #ccc; border-radius: 12px; 
-      cursor: pointer; background: white; display: block;
+      cursor: pointer; background: #fff;
     }
 
-    /* Відео 40% */
-    .video-wrap { display: flex; justify-content: center; width: 100%; }
-    video { width: 40% !important; border-radius: 12px; background: #000; margin: 15px 0; }
-
-    #waveform { 
-      width: 100%; height: 120px; background: #eee; border-radius: 10px; 
-      border: 1px solid #ddd; display: block; 
+    /* Оверлей прогресу */
+    #fullOverlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9); z-index: 9999; flex-direction: column;
+      justify-content: center; align-items: center; color: white;
     }
+
+    #waveform { width: 100%; height: 120px; background: #fafafa; border-radius: 10px; border: 1px solid #eee; display: block; margin: 10px 0; }
     
-    button { 
-      width: 100%; padding: 16px; border: none; border-radius: 14px; 
-      background: var(--primary); color: white; font-size: 16px; 
-      font-weight: bold; cursor: pointer; transition: 0.2s; 
-    }
-    
-    #downloadBtn { 
-      display: none; margin-top: 12px; text-align: center; padding: 16px; 
-      background: var(--success); color: white; text-decoration: none; 
-      border-radius: 14px; font-weight: bold; 
-    }
+    .video-container { display: flex; justify-content: center; width: 100%; }
+    video { width: 40% !important; border-radius: 12px; background: #000; margin-top: 10px; }
 
-    /* Допоміжні класи */
-    .hidden { display: none !important; }
+    label { font-size: 14px; margin-top: 15px; display: block; font-weight: bold; }
+    .slider-info { display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-top: 4px; }
+    input[type="range"] { width: 100%; margin-top: 8px; cursor: pointer; }
+
+    button { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--primary); color: white; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    
+    #downloadBtn { display: none; margin-top: 12px; text-align: center; padding: 15px; background: var(--success); color: white; text-decoration: none; border-radius: 12px; font-weight: bold; }
+
+    /* Початкові стани */
+    #editorSection, #resultSection { display: none; }
   </style>
 </head>
 <body>
@@ -76,21 +65,21 @@
 <div class="bg-circle"></div>
 
 <div id="fullOverlay">
-    <h2 style="color:white">Обробка відео...</h2>
-    <div id="ovPercent" style="font-size: 48px; font-weight: bold; color: var(--primary);">0%</div>
-    <div style="width: 80%; max-width: 400px; background: #222; height: 12px; border-radius: 6px; overflow: hidden; margin: 20px 0;">
+    <h2 style="color:white">Обробка...</h2>
+    <div id="ovPercent" style="font-size: 40px; font-weight: bold; margin: 10px; color: var(--primary);">0%</div>
+    <div style="width: 80%; max-width: 400px; background: #333; height: 10px; border-radius: 5px; overflow: hidden;">
         <div id="ovBar" style="width: 0%; height: 100%; background: var(--primary); transition: 0.3s;"></div>
     </div>
-    <div id="ovEta" style="opacity: 0.7;">Залишилось: -- сек</div>
+    <div id="ovEta" style="margin-top: 15px; opacity: 0.8;">Осталось: -- сек</div>
 </div>
 
 <div class="app">
-  <div class="card" id="cardUpload">
+  <div class="card" id="uploadSection">
     <h2>Remove Pauses</h2>
     <input type="file" id="fileInput" accept="video/*">
   </div>
 
-  <div class="card hidden" id="cardEditor">
+  <div class="card" id="editorSection">
     <div style="display: flex; background: #eee; border-radius: 10px; padding: 4px; margin-bottom: 15px;">
       <div id="tabAuto" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px; background: var(--primary); color: white; font-weight: bold;">Авто</div>
       <div id="tabManual" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px;">Вручную</div>
@@ -99,36 +88,34 @@
     <div id="manualControls" style="display: none;">
       <label>Минимальная тишина</label>
       <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
-      <div style="display:flex; justify-content:space-between; font-size:12px"><span>Короткі</span><span id="durationVal">0.5 сек</span></div>
-      
+      <div class="slider-info"><span>Короткие паузы</span><span id="durationVal">0.5 сек</span></div>
       <label>Чувствительность (dB)</label>
       <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
-      <div style="display:flex; justify-content:space-between; font-size:12px"><span>Тихіше</span><span id="thresholdVal">-35 dB</span></div>
+      <div class="slider-info"><span>Тише</span><span id="thresholdVal">-35 dB</span></div>
     </div>
 
-    <div id="autoInfo" style="padding: 10px; font-size: 14px; background: #f0f7ff; border-radius: 10px; margin-bottom: 10px; border: 1px solid #d0e0ff;">
-      ✨ Режим «Авто» підбере налаштування автоматично.
+    <div id="autoInfo" style="padding: 10px; font-size: 14px; background: #f0f7ff; border-radius: 10px; border: 1px solid #d0e0ff; margin-bottom: 10px;">
+      ✨ Режим «Авто» подберет настройки под ваш звук.
     </div>
 
-    <label>Аналіз звуку:</label>
+    <label>Анализ звука:</label>
     <canvas id="waveform"></canvas>
 
-    <div id="progCont" class="hidden">
+    <div id="progCont" style="display:none;">
       <div id="statusText">0%</div>
       <div id="progressBar" style="width:0%"></div>
       <div id="etaText"></div>
     </div>
 
-    <button id="processBtn" style="margin-top: 15px;">Запустити обробку</button>
+    <button id="processBtn">Запустить обработку</button>
   </div>
 
-  <div class="card hidden" id="cardResult">
-    <h2>Готово!</h2>
-    <div class="video-wrap">
+  <div class="card" id="resultSection">
+    <div class="video-container">
       <video id="preview" controls></video>
     </div>
-    <a id="downloadBtn" download="no_pauses.mp4">Скачати готове відео</a>
-    <button style="background:#555; margin-top:10px;" onclick="location.reload()">Нове відео</button>
+    <a id="downloadBtn" download="no_pauses.mp4">Скачать готовое видео</a>
+    <button style="background:#555; margin-top:10px;" onclick="location.reload()">Новое видео</button>
   </div>
 </div>
 
@@ -136,61 +123,57 @@
 <script src="script.js"></script>
 
 <script>
-  // Елементи інтерфейсу
-  const fileInput = document.getElementById('fileInput');
-  const cardUpload = document.getElementById('cardUpload');
-  const cardEditor = document.getElementById('cardEditor');
-  const cardResult = document.getElementById('cardResult');
+  const fInput = document.getElementById('fileInput');
+  const btnAuto = document.getElementById('tabAuto');
+  const btnManual = document.getElementById('tabManual');
+  const manControls = document.getElementById('manualControls');
+  const autoInfo = document.getElementById('autoInfo');
   const overlay = document.getElementById('fullOverlay');
 
-  // Елементи твого скрипта для спостереження
+  // 1. Поява редактора
+  fInput.onchange = () => {
+    if (fInput.files.length > 0) {
+      document.getElementById('uploadSection').style.display = 'none';
+      document.getElementById('editorSection').style.display = 'block';
+    }
+  };
+
+  // 2. ФІКС ПОВЗУНКІВ (Перемикання вручну)
+  btnAuto.onclick = () => {
+    btnAuto.style.background = 'var(--primary)'; btnAuto.style.color = 'white';
+    btnManual.style.background = 'none'; btnManual.style.color = '#333';
+    manControls.style.display = 'none';
+    autoInfo.style.display = 'block';
+  };
+
+  btnManual.onclick = () => {
+    btnManual.style.background = 'var(--primary)'; btnManual.style.color = 'white';
+    btnAuto.style.background = 'none'; btnAuto.style.color = '#333';
+    manControls.style.display = 'block';
+    autoInfo.style.display = 'none';
+  };
+
+  // 3. Синхронізація оверлею
   const realBar = document.getElementById('progressBar');
   const realStatus = document.getElementById('statusText');
-  const realEta = document.getElementById('etaText');
   const dlBtn = document.getElementById('downloadBtn');
 
-  // 1. Коли вибрав файл - показуємо редактор
-  fileInput.addEventListener('change', () => {
-    if (fileInput.files.length > 0) {
-      cardUpload.classList.add('hidden');
-      cardEditor.classList.remove('hidden');
-    }
-  });
-
-  // 2. Спостерігаємо за процесом
   const observer = new MutationObserver(() => {
     const pct = realBar.style.width;
-    
-    // Показуємо оверлей тільки якщо йде реальна обробка (від 1% до 99%)
     if (pct !== "" && pct !== "0%" && pct !== "100%" && window.getComputedStyle(dlBtn).display === 'none') {
       overlay.style.display = 'flex';
       document.getElementById('ovBar').style.width = pct;
       document.getElementById('ovPercent').innerText = realStatus.innerText;
-      document.getElementById('ovEta').innerText = realEta.innerText;
     }
-
-    // Якщо з'явилася кнопка "Скачать" - значить все готово
     if (window.getComputedStyle(dlBtn).display === 'block') {
       overlay.style.display = 'none';
-      cardEditor.classList.add('hidden');
-      cardResult.classList.remove('hidden');
+      document.getElementById('editorSection').style.display = 'none';
+      document.getElementById('resultSection').style.display = 'block';
     }
   });
 
   observer.observe(realBar, { attributes: true });
   observer.observe(dlBtn, { attributes: true });
-
-  // 3. Таби (візуальне перемикання)
-  const tAuto = document.getElementById('tabAuto');
-  const tManual = document.getElementById('tabManual');
-  tAuto.onclick = () => {
-    tAuto.style.background = 'var(--primary)'; tAuto.style.color = 'white';
-    tManual.style.background = 'none'; tManual.style.color = '#333';
-  };
-  tManual.onclick = () => {
-    tManual.style.background = 'var(--primary)'; tManual.style.color = 'white';
-    tAuto.style.background = 'none'; tAuto.style.color = '#333';
-  };
 </script>
 
 </body>
