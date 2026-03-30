@@ -5,7 +5,13 @@ const { createFFmpeg, fetchFile } = FFmpeg;
 const ffmpeg = createFFmpeg({ log: true });
 
 let loaded = false;
-let logs = [];
+
+// =========================
+// STATE
+// =========================
+let audioData = null;
+let audioDuration = 0;
+let sampleRate = 44100;
 
 // =========================
 // STATUS
@@ -15,14 +21,7 @@ function setStatus(text) {
 }
 
 // =========================
-// LOGGER
-// =========================
-ffmpeg.setLogger(({ message }) => {
-  logs.push(message);
-});
-
-// =========================
-// LOAD
+// LOAD FFMPEG
 // =========================
 async function loadFFmpeg() {
   if (!loaded) {
@@ -33,59 +32,61 @@ async function loadFFmpeg() {
 }
 
 // =========================
-// SAFE RUN (fallback)
+// LOAD AUDIO
 // =========================
-async function safeRun(argsFast, argsSafe) {
-  try {
-    await ffmpeg.run(...argsFast);
-    return "fast";
-  } catch (e) {
-    console.warn("fallback to safe encode");
-    await ffmpeg.run(...argsSafe);
-    return "safe";
-  }
+async function loadAudioData(file) {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  await audioCtx.resume();
+
+  const buffer = await file.arrayBuffer();
+  const decoded = await audioCtx.decodeAudioData(buffer);
+
+  audioData = decoded.getChannelData(0);
+  audioDuration = decoded.duration;
+  sampleRate = decoded.sampleRate;
 }
 
 // =========================
-// PARSE SILENCE
+// DETECT SILENCE (PCM)
 // =========================
-function parseSilence(logs) {
+function detectSilencePCM(thresholdDb, minDuration) {
+  const threshold = Math.pow(10, thresholdDb / 20);
+  const windowSize = 1024;
+
   const silences = [];
-  let current = null;
+  let silenceStart = null;
 
-  logs.forEach(line => {
-    const start = line.match(/silence_start: (\d+\.?\d*)/);
-    const end = line.match(/silence_end: (\d+\.?\d*)/);
+  for (let i = 0; i < audioData.length; i += windowSize) {
+    let sum = 0;
 
-    if (start) current = { start: parseFloat(start[1]) };
-
-    if (end && current) {
-      current.end = parseFloat(end[1]);
-      silences.push(current);
-      current = null;
+    for (let j = 0; j < windowSize; j++) {
+      const sample = audioData[i + j] || 0;
+      sum += sample * sample;
     }
-  });
+
+    const rms = Math.sqrt(sum / windowSize);
+    const time = i / sampleRate;
+
+    if (rms < threshold) {
+      if (silenceStart === null) silenceStart = time;
+    } else {
+      if (silenceStart !== null) {
+        const dur = time - silenceStart;
+        if (dur >= minDuration) {
+          silences.push({ start: silenceStart, end: time });
+        }
+        silenceStart = null;
+      }
+    }
+  }
 
   return silences;
 }
 
 // =========================
-// GET DURATION
+// BUILD SOUND SEGMENTS
 // =========================
-function getDuration(logs) {
-  for (const line of logs) {
-    const m = line.match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
-    if (m) {
-      return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]);
-    }
-  }
-  return 0;
-}
-
-// =========================
-// BUILD SEGMENTS (АГРЕССИВНО)
-// =========================
-function buildSegments(silences, duration) {
+function buildSoundSegments(silences, duration) {
   const segments = [];
   let prev = 0;
 
@@ -100,7 +101,7 @@ function buildSegments(silences, duration) {
     segments.push({ start: prev, end: duration });
   }
 
-  // 🔥 СИЛЬНОЕ объединение
+  // merge близкие сегменты
   const merged = [];
   const GAP = 0.4;
 
@@ -120,39 +121,62 @@ function buildSegments(silences, duration) {
 }
 
 // =========================
-// MAIN
+// SAFE RUN (copy + fallback)
+// =========================
+async function safeRun(argsFast, argsSafe) {
+  try {
+    await ffmpeg.run(...argsFast);
+    return true;
+  } catch (e) {
+    console.warn("fallback encode");
+    await ffmpeg.run(...argsSafe);
+    return false;
+  }
+}
+
+// =========================
+// FILE LOAD
+// =========================
+document.getElementById("fileInput").onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  document.getElementById("preview").src =
+    URL.createObjectURL(file);
+
+  setStatus("Анализ аудио...");
+
+  await loadAudioData(file);
+
+  setStatus("Готово");
+};
+
+// =========================
+// MAIN PROCESS
 // =========================
 document.getElementById("processBtn").onclick = async () => {
   const file = document.getElementById("fileInput").files[0];
   if (!file) return alert("Выбери файл");
 
   await loadFFmpeg();
-  logs = [];
 
-  setStatus("Загрузка...");
-  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
+  setStatus("Анализ (быстро)...");
 
-  const duration = document.getElementById("duration").value;
-  const threshold = document.getElementById("threshold").value;
+  const threshold = parseFloat(document.getElementById("threshold").value);
+  const duration = parseFloat(document.getElementById("duration").value);
 
-  // =========================
-  // DETECT
-  // =========================
-  setStatus("Поиск тишины...");
+  // 🔥 анализ через Web Audio
+  const silences = detectSilencePCM(threshold, duration);
 
-  await ffmpeg.run(
-    "-i", "input.mp4",
-    "-af", `silencedetect=noise=${threshold}dB:d=${duration}`,
-    "-f", "null",
-    "-"
-  );
+  let segments = buildSoundSegments(silences, audioDuration);
 
-  const silences = parseSilence(logs);
-  const totalDuration = getDuration(logs);
-
-  let segments = buildSegments(silences, totalDuration);
+  // ограничение для iPhone
+  if (segments.length > 40) {
+    segments = segments.slice(0, 40);
+  }
 
   const PAD = 0.05;
+
   segments = segments.map(s => ({
     start: Math.max(0, s.start - PAD),
     end: s.end + PAD
@@ -161,7 +185,12 @@ document.getElementById("processBtn").onclick = async () => {
   setStatus(`Сегментов: ${segments.length}`);
 
   // =========================
-  // CUT (FAST + FALLBACK)
+  // LOAD FILE IN FFMPEG
+  // =========================
+  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
+
+  // =========================
+  // CUT
   // =========================
   for (let i = 0; i < segments.length; i++) {
     const s = segments[i];
@@ -189,16 +218,21 @@ document.getElementById("processBtn").onclick = async () => {
   }
 
   // =========================
-  // CONCAT (БЫСТРО)
+  // CONCAT
   // =========================
   setStatus("Склейка...");
 
   let concatList = "";
+
   for (let i = 0; i < segments.length; i++) {
     concatList += `file part${i}.mp4\n`;
   }
 
-  ffmpeg.FS("writeFile", "list.txt", new TextEncoder().encode(concatList));
+  ffmpeg.FS(
+    "writeFile",
+    "list.txt",
+    new TextEncoder().encode(concatList)
+  );
 
   await safeRun(
     [
