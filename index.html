@@ -1,56 +1,177 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pause Remover Pro (Memory Optimized)</title>
-    <style>
-        body { margin: 0; font-family: -apple-system, sans-serif; background: #f0f4f8; display: flex; justify-content: center; }
-        .app { width: 100%; max-width: 600px; padding: 20px; }
-        .card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        h2 { text-align: center; color: #2b6cff; margin-top: 0; }
-        input[type="range"] { width: 100%; margin: 10px 0; }
-        .slider-label { display: flex; justify-content: space-between; font-size: 14px; color: #555; }
-        button { width: 100%; padding: 14px; border: none; border-radius: 12px; background: #2b6cff; color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        #waveform { width: 100%; height: 120px; background: #fafafa; border-radius: 8px; display: block; }
-        video { width: 100%; border-radius: 12px; margin-top: 10px; background: #000; }
-        #status { text-align: center; font-size: 14px; margin-top: 10px; color: #666; min-height: 1.2em; }
-        #downloadBtn { display: none; text-align: center; padding: 14px; background: #00b894; color: white; text-decoration: none; border-radius: 12px; font-weight: bold; margin-top: 10px; }
-        .progress-container { width: 100%; height: 6px; background: #eee; border-radius: 3px; margin-top: 10px; overflow: hidden; }
-        #progressFill { width: 0%; height: 100%; background: #2b6cff; transition: width 0.3s; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pause Remover</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5f9ff;
+      display: flex;
+      justify-content: center;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 600px;
+      padding: 20px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    }
+
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #2b6cff;
+    }
+
+    input[type="file"] {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+    }
+
+    label {
+      font-size: 14px;
+      margin-top: 10px;
+      display: block;
+    }
+
+    .slider-value {
+      font-size: 13px;
+      color: #555;
+      margin-top: 4px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 12px;
+      background: #2b6cff;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background: #1f54cc;
+    }
+
+    #progress {
+      text-align: center;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    #waveform {
+      width: 100%;
+      height: 150px;
+      display: block;
+      border-radius: 10px;
+      background: #fafafa;
+    }
+
+    video {
+      width: 100%;
+      border-radius: 12px;
+    }
+
+    #downloadBtn {
+      display: none;
+      margin-top: 10px;
+      text-align: center;
+      padding: 12px;
+      background: #00b894;
+      color: white;
+      text-decoration: none;
+      border-radius: 12px;
+      font-weight: bold;
+    }
+
+    #downloadBtn:hover {
+      background: #019874;
+    }
+  </style>
 </head>
+
 <body>
+
 <div class="app">
-    <div class="card">
-        <h2>Pause Remover</h2>
-        <input type="file" id="fileInput" accept="video/*">
-        
-        <div style="margin-top:15px">
-            <div class="slider-label"><span>Мин. тишина</span><span id="durVal">0.5 сек</span></div>
-            <input type="range" id="duration" min="0.2" max="2" step="0.1" value="0.5">
-            
-            <div class="slider-label"><span>Чувствительность</span><span id="thrVal">-35 dB</span></div>
-            <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
-        </div>
-        
-        <button id="processBtn">Обработать и сжать</button>
-        <div id="status">Выберите видео файл</div>
-        <div class="progress-container"><div id="progressFill"></div></div>
-    </div>
 
-    <div class="card">
-        <canvas id="waveform"></canvas>
-    </div>
+  <h2>Remove pauses</h2>
 
-    <div class="card">
-        <video id="preview" controls></video>
-        <a id="downloadBtn" download="result_optimized.mp4">Скачать результат</a>
-    </div>
+  <!-- FILE -->
+  <div class="card">
+    <input type="file" id="fileInput" accept="video/*">
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="card">
+
+    <label>Минимальная тишина (сек)</label>
+    <input type="range" id="duration" min="0.5" max="1" step="0.05" value="0.75">
+    <div class="slider-value" id="durationVal">0.75 сек</div>
+
+    <label>Чувствительность (dB)</label>
+    <input type="range" id="threshold" min="-60" max="-20" step="1" value="-40">
+    <div class="slider-value" id="thresholdVal">-40 dB</div>
+
+    <button id="processBtn">Обработать видео</button>
+
+    <div id="progress"></div>
+
+  </div>
+
+  <!-- WAVEFORM -->
+  <div class="card">
+    <canvas id="waveform"></canvas>
+  </div>
+
+  <!-- VIDEO -->
+  <div class="card">
+    <video id="preview" controls></video>
+    <a id="downloadBtn" download="output.mp4">Скачать видео</a>
+  </div>
+
 </div>
 
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script src="./ffmpeg/ffmpeg.min.js"></script>
 <script src="script.js"></script>
+
+<script>
+  // отображение значений ползунков
+
+  const duration = document.getElementById("duration");
+  const threshold = document.getElementById("threshold");
+
+  const durationVal = document.getElementById("durationVal");
+  const thresholdVal = document.getElementById("thresholdVal");
+
+ duration.addEventListener("input", () => {
+  durationVal.innerText = duration.value + " сек";
+});
+
+threshold.addEventListener("input", () => {
+  thresholdVal.innerText = threshold.value + " dB";
+});
+</script>
+
 </body>
 </html>
