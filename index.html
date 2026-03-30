@@ -3,14 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pause Remover Pro - Ultra</title>
+    <title>Pause Remover Pro - WebProgger</title>
     <style>
         :root { --p-clr: #2b6cff; --s-clr: #00b894; --b-clr: #000; }
         * { box-sizing: border-box; }
         body { 
             margin: 0; font-family: -apple-system, sans-serif; background: var(--b-clr); 
-            display: flex; justify-content: center; color: #333; min-height: 100vh;
+            display: flex; flex-direction: column; align-items: center; color: #333; min-height: 100vh;
+            padding-top: 100px; /* Відступ для фіксованої шапки */
         }
+        
+        /* СТИЛІ ШАПКИ */
+        header { width: 100%; }
+
         .bg_fx_99 {
             position: fixed; width: 600px; height: 600px;
             background: radial-gradient(circle, #1e3a8a 0%, rgba(0,0,0,0) 70%);
@@ -22,12 +27,19 @@
             margin-bottom: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
         }
         h2 { text-align: center; margin-top: 0; color: var(--p-clr); }
-        .f_inp_88 { width: 100%; padding: 40px 20px; border: 2px dashed #ccc; border-radius: 12px; cursor: pointer; background: #fff; text-align: center; font-weight: bold; }
         
+        .f_inp_88 { width: 100%; padding: 40px 20px; border: 2px dashed #ccc; border-radius: 12px; cursor: pointer; background: #fff; text-align: center; font-weight: bold; transition: 0.3s; }
+        .f_inp_88:hover { border-color: var(--p-clr); background: #f0f7ff; }
+        
+        /* ОПИС ПРОГРАМИ */
+        .app_description { margin-top: 20px; font-size: 14px; color: #555; line-height: 1.5; }
+        .app_description h3 { color: #000; font-size: 16px; margin-bottom: 8px; }
+        .app_description ul { padding-left: 20px; margin: 0; }
+
         /* Overlay System */
         #ov_scr_55 {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 9999; flex-direction: column;
+            background: rgba(0,0,0,0.95); z-index: 9999999; flex-direction: column;
             justify-content: center; align-items: center; color: white; text-align: center;
         }
         .p_bar_bg { width: 80%; max-width: 400px; height: 12px; background: #333; border-radius: 6px; overflow: hidden; margin: 20px 0; }
@@ -56,6 +68,22 @@
 </head>
 <body>
 
+<header>
+    <div style="padding-top: 16px;width:100%;min-height:75px;position:fixed;top:0;left:0;z-index:999999;background:white;border-bottom:1px solid #ddd">
+        <div style="width:95%;max-width:1200px;margin:0 auto;padding:10px 15px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:120px">
+                <div style="display:flex;flex-direction:column;line-height:1.2;max-width:240px">
+                    <span style="font-size:20px;font-weight:bold;color:#000">
+                        <a href="https://webprogger.wordpress.com/" style="text-decoration:none">Web<span style="color:darkblue">Progger</span></a>
+                    </span>
+                    <div style="margin:0;padding:0;font-size:14px;color:#444">AI Video Tools</div>
+                </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px"></div>
+        </div>
+    </div>
+</header>
+
 <div class="bg_fx_99"></div>
 
 <div id="ov_scr_55">
@@ -71,6 +99,16 @@
         <div class="f_inp_88" onclick="document.getElementById('real_f').click()">
             Натисніть або перетягніть відео сюди
             <input type="file" id="real_f" accept="video/*" style="display:none">
+        </div>
+
+        <div class="app_description">
+            <h3>Про програму:</h3>
+            <p>Цей інструмент автоматично аналізує ваше відео та видаляє моменти тиші (паузи). Це ідеально підходить для подкастів, навчальних відео та влогів.</p>
+            <ul>
+                <li>⚡ <b>Швидкість:</b> Обробка відбувається прямо у вашому браузері.</li>
+                <li>🔒 <b>Приватність:</b> Відео не завантажується на сервер, все лишається на вашому пристрої.</li>
+                <li>🤖 <b>AI Аналіз:</b> Розумний підбір порогу шуму для чистого звуку.</li>
+            </ul>
         </div>
     </div>
 
@@ -111,6 +149,7 @@ const { createFFmpeg, fetchFile } = FFmpeg;
 const ffmpeg = createFFmpeg({ log: false, corePath: './ffmpeg/ffmpeg-core.js' });
 
 let aBuffer = null, cRMS = [], aDur = 0, sRate = 44100, isLoaded = false, cMode = 'auto';
+let wakeLock = null;
 
 const dom = {
     fInp: document.getElementById('real_f'),
@@ -130,7 +169,20 @@ const dom = {
     ovTitle: document.getElementById('ov_title')
 };
 
-// ТАБИ
+async function requestWakeLock() {
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLock = await navigator.wakeLock.request('screen');
+        }
+    } catch (err) {}
+}
+
+function releaseWakeLock() {
+    if (wakeLock !== null) {
+        wakeLock.release().then(() => { wakeLock = null; });
+    }
+}
+
 function setTab(m) {
     cMode = m;
     document.getElementById('t_auto').classList.toggle('active_t', m === 'auto');
@@ -142,7 +194,6 @@ function setTab(m) {
 document.getElementById('t_auto').onclick = () => setTab('auto');
 document.getElementById('t_manual').onclick = () => setTab('manual');
 
-// АНАЛІЗ ЗВУКУ
 function preRMS() {
     cRMS = []; const step = 1024;
     for (let i = 0; i < aBuffer.length; i += step) {
@@ -172,16 +223,12 @@ function findS(db, dur) {
 
 function draw() {
     const ctx = dom.cvs.getContext('2d');
-    // Встановлюємо розмір canvas рівним його відображуваному розміру
     dom.cvs.width = dom.cvs.clientWidth;
     dom.cvs.height = dom.cvs.clientHeight;
-    
     const w = dom.cvs.width;
     const h = dom.cvs.height;
     ctx.clearRect(0,0,w,h);
-    
     if(!aBuffer) return;
-    
     const step = Math.ceil(aBuffer.length/w);
     ctx.fillStyle = "#2b6cff";
     for(let i=0; i<w; i++){
@@ -192,10 +239,8 @@ function draw() {
         }
         ctx.fillRect(i, (1+min)*(h/2), 1, Math.max(1,(max-min)*(h/2)));
     }
-    
     const p = cMode==='auto' ? getAuto() : {db: parseFloat(dom.db.value), dur: parseFloat(dom.dur.value)};
     if(cMode==='auto') document.getElementById('a_info').innerText = `✨ Авто: ${p.db}dB, ${p.dur}s`;
-    
     const sil = findS(p.db, p.dur);
     ctx.fillStyle = "rgba(255, 50, 50, 0.4)";
     sil.forEach(s => {
@@ -204,33 +249,24 @@ function draw() {
     });
 }
 
-// ЗАВАНТАЖЕННЯ ФАЙЛУ
 dom.fInp.onchange = async (e) => {
     const file = e.target.files[0]; if(!file) return;
-    
-    dom.ovTitle.innerText = "Декодування аудіодоріжки...";
+    dom.ovTitle.innerText = "Декодування звуку...";
     dom.ovPct.innerText = "Зачекайте";
     dom.ov.style.display = 'flex';
-    
     const aCtx = new (window.AudioContext || window.webkitAudioContext)();
     try {
         const arrayBuf = await file.arrayBuffer();
         const dec = await aCtx.decodeAudioData(arrayBuf);
         aBuffer = dec.getChannelData(0); aDur = dec.duration; sRate = dec.sampleRate;
-        
         preRMS();
-        
-        // Показуємо редактор ПЕРЕД малюванням
         dom.sFile.classList.add('hidden_node');
         dom.sEdit.classList.remove('hidden_node');
-        
-        // Малюємо доріжку
         draw();
-        
         dom.vPre.src = URL.createObjectURL(file);
         dom.ov.style.display = 'none';
     } catch (err) {
-        alert("Помилка при читанні відео. Спробуйте інший файл.");
+        alert("Помилка при читанні відео.");
         dom.ov.style.display = 'none';
     }
 };
@@ -238,34 +274,28 @@ dom.fInp.onchange = async (e) => {
 dom.dur.oninput = () => { document.getElementById('txt_dur').innerText = dom.dur.value+" сек"; draw(); };
 dom.db.oninput = () => { document.getElementById('txt_db').innerText = dom.db.value+" dB"; draw(); };
 
-// ОБРОБКА
 dom.btnGo.onclick = async () => {
     const file = dom.fInp.files[0]; if(!file) return;
     dom.btnGo.disabled = true;
-    
+    await requestWakeLock();
     dom.ovTitle.innerText = "Підготовка...";
     dom.ovPct.innerText = "0%";
     dom.bar.style.width = "0%";
     dom.ov.style.display = 'flex';
-    
     if(!isLoaded) { 
-        dom.ovTitle.innerText = "Завантаження ядра FFmpeg...";
+        dom.ovTitle.innerText = "Завантаження ядра...";
         await ffmpeg.load(); isLoaded = true; 
     }
-    
     const p = cMode==='auto' ? getAuto() : {db: parseFloat(dom.db.value), dur: parseFloat(dom.dur.value)};
     const sil = findS(p.db, p.dur);
     const segs = []; let prev = 0, PAD = 0.1;
-    
     sil.forEach(s => {
         if(s.st > prev) segs.push({s: Math.max(0, prev-(prev===0?0:PAD)), e: s.st+PAD});
         prev = s.en;
     });
     if(prev < aDur) segs.push({s: Math.max(0, prev-PAD), e: aDur});
-    
     const tOut = segs.reduce((a,s)=>a+(s.e-s.s), 0);
     ffmpeg.FS("writeFile", "src.mp4", await fetchFile(file));
-    
     let f = "", c = "";
     segs.forEach((s, i) => {
         f += `[0:v]trim=start=${s.s.toFixed(3)}:end=${s.e.toFixed(3)},setpts=PTS-STARTPTS[v${i}];`;
@@ -284,26 +314,27 @@ dom.btnGo.onclick = async () => {
             dom.ovPct.innerText = pct.toFixed(0)+"%";
             const elap = (Date.now()-startT)/1000;
             const eta = Math.round((tOut-t)/(t/elap));
-            dom.ovEta.innerText = (eta > 0 && pct < 100) ? `Залишилось: ~${eta} сек` : "Фіналізація файлу...";
+            dom.ovEta.innerText = (eta > 0 && pct < 100) ? `Залишилось: ~${eta} сек` : "Фіналізація...";
         }
     });
 
-    dom.ovTitle.innerText = "Йде видалення пауз...";
-    await ffmpeg.run("-i", "src.mp4", "-filter_complex", f, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "res.mp4");
-
-    const data = ffmpeg.FS("readFile", "res.mp4");
-    const url = URL.createObjectURL(new Blob([data.buffer], {type:"video/mp4"}));
-    
-    dom.vPre.src = url; 
-    dom.dl.href = url; 
-    dom.dl.style.display = "block";
-    
-    dom.ov.style.display = 'none';
-    dom.sEdit.classList.add('hidden_node');
-    dom.sRes.classList.remove('hidden_node');
-    dom.btnGo.disabled = false;
+    try {
+        dom.ovTitle.innerText = "Йде обробка відео...";
+        await ffmpeg.run("-i", "src.mp4", "-filter_complex", f, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "res.mp4");
+        const data = ffmpeg.FS("readFile", "res.mp4");
+        const url = URL.createObjectURL(new Blob([data.buffer], {type:"video/mp4"}));
+        dom.vPre.src = url; dom.dl.href = url; dom.dl.style.display = "block";
+        dom.ov.style.display = 'none';
+        dom.sEdit.classList.add('hidden_node');
+        dom.sRes.classList.remove('hidden_node');
+    } catch (e) {
+        alert("Помилка обробки.");
+        dom.ov.style.display = 'none';
+    } finally {
+        dom.btnGo.disabled = false;
+        releaseWakeLock();
+    }
 };
 </script>
-
 </body>
 </html>
