@@ -1,179 +1,49 @@
-const { createFFmpeg, fetchFile } = FFmpeg;
-const ffmpeg = createFFmpeg({ 
-    log: false, 
-    corePath: './ffmpeg/ffmpeg-core.js' 
-});
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pause Remover Pro</title>
+    <style>
+        :root { --p-clr: #2b6cff; --b-clr: #050505; }
+        body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--b-clr); color: #fff; text-align: center; padding: 20px; }
+        .card { background: #fff; border-radius: 20px; padding: 25px; color: #333; max-width: 400px; margin: 20px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .btn_file { padding: 40px 10px; border: 2px dashed #ccc; border-radius: 15px; background: #f9f9f9; cursor: pointer; color: #666; font-weight: bold; }
+        #ov { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; flex-direction:column; justify-content:center; align-items:center; }
+        #debug_log { background: #222; color: #ff4d4d; padding: 10px; border-radius: 8px; margin-top: 20px; font-family: monospace; font-size: 12px; text-align: left; overflow-x: auto; display: none; }
+        .hidden { display: none !important; }
+        canvas { width: 100%; height: 80px; background: #eee; border-radius: 10px; margin: 15px 0; }
+        .btn_go { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--p-clr); color: white; font-weight: bold; font-size: 16px; cursor: pointer; }
+    </style>
+</head>
+<body>
 
-let aBuf = null, cRMS = [], aDur = 0, sRate = 44100, isLoaded = false, mode = 'auto';
+<div id="ov">
+    <div id="msg">Завантаження...</div>
+    <div id="pct" style="font-size: 40px; font-weight: 800;">0%</div>
+</div>
 
-const ui = {
-    fin: document.getElementById('fin'),
-    s1: document.getElementById('step1'),
-    s2: document.getElementById('step2'),
-    s3: document.getElementById('step3'),
-    ov: document.getElementById('ov_loading'),
-    bar: document.getElementById('p_fill'),
-    pct: document.getElementById('ov_pct'),
-    msg: document.getElementById('ov_msg'),
-    cvs: document.getElementById('cvs'),
-    run: document.getElementById('run'),
-    v_res: document.getElementById('v_res'),
-    dl: document.getElementById('btn_dl'),
-    r_db: document.getElementById('r_db'),
-    v_db: document.getElementById('v_db')
-};
+<div id="step1" class="card">
+    <h2 style="margin-top:0">Крок 1: Відео</h2>
+    <div class="btn_file" onclick="document.getElementById('fin').click()">
+        📁 Натисніть для вибору файлу
+        <input type="file" id="fin" accept="video/*" style="display:none">
+    </div>
+    <div id="debug_log"></div>
+</div>
 
-// --- ФУНКЦІЯ МАЛЮВАННЯ ХВИЛІ ---
-function draw() {
-    if(!aBuf) return;
-    const ctx = ui.cvs.getContext('2d');
-    const w = ui.cvs.width = ui.cvs.clientWidth * 2;
-    const h = ui.cvs.height = ui.cvs.clientHeight * 2;
-    ctx.clearRect(0,0,w,h);
-    const step = Math.ceil(aBuf.length / w);
-    ctx.fillStyle = "#2b6cff";
-    for(let i=0; i<w; i++){
-        let min=1, max=-1;
-        for(let j=0; j<step; j++){
-            const v = aBuf[(i*step)+j]||0;
-            if(v<min) min=v; if(v>max) max=v;
-        }
-        ctx.fillRect(i, (1+min)*(h/2), 2, Math.max(2,(max-min)*(h/2)));
-    }
-}
+<div id="step2" class="card hidden">
+    <h2 style="margin-top:0">Крок 2: Налаштування</h2>
+    <canvas id="cvs"></canvas>
+    <button id="run" class="btn_go">Вирізати паузи</button>
+</div>
 
-// --- ВИБІР ФАЙЛУ (КРИТИЧНО ДЛЯ IPHONE) ---
-ui.fin.onchange = async (e) => {
-    const file = e.target.files[0]; if(!file) return;
+<div id="step3" class="card hidden">
+    <video id="v_res" controls style="width:100%; border-radius:10px;"></video>
+    <button class="btn_go" style="margin-top:10px; background:#444" onclick="location.reload()">Почати заново</button>
+</div>
 
-    ui.ov.style.display = 'flex';
-    ui.msg.innerText = "Читання аудіо...";
-    
-    // Створюємо аудіо-контекст примусово
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    const aCtx = new AudioContext();
-    
-    try {
-        if (aCtx.state === 'suspended') await aCtx.resume();
-
-        const arrayBuf = await file.arrayBuffer();
-        
-        // СУМІСНІСТЬ З SAFARI (iOS): Використовуємо колбеки замість Promise
-        aCtx.decodeAudioData(arrayBuf, (decoded) => {
-            aBuf = decoded.getChannelData(0);
-            aDur = decoded.duration;
-            sRate = decoded.sampleRate;
-
-            // Швидкий розрахунок гучності
-            cRMS = [];
-            const blockSize = 1024;
-            for (let i = 0; i < aBuf.length; i += blockSize) {
-                let sum = 0;
-                for (let j = 0; j < blockSize; j++) {
-                    const v = aBuf[i+j] || 0;
-                    sum += v*v;
-                }
-                cRMS.push(Math.sqrt(sum/blockSize));
-            }
-
-            ui.s1.classList.add('hidden');
-            ui.s2.classList.remove('hidden');
-            draw();
-            ui.ov.style.display = 'none';
-        }, (err) => {
-            alert("Safari не зміг декодувати звук. Спробуйте інше відео.");
-            ui.ov.style.display = 'none';
-        });
-    } catch (err) {
-        alert("Помилка доступу до файлу.");
-        ui.ov.style.display = 'none';
-    }
-};
-
-// --- ОБРОБКА ТАБІВ ---
-document.getElementById('t_a').onclick = () => { mode='auto'; ui.m_ui?.classList.add('hidden'); document.getElementById('t_a').classList.add('active'); document.getElementById('t_m').classList.remove('active'); };
-document.getElementById('t_m').onclick = () => { mode='manual'; document.getElementById('m_ui').classList.remove('hidden'); document.getElementById('t_m').classList.add('active'); document.getElementById('t_a').classList.remove('active'); };
-ui.r_db.oninput = () => { ui.v_db.innerText = ui.r_db.value + " dB"; };
-
-// --- ГОЛОВНИЙ ПРОЦЕС (FFMPEG) ---
-ui.run.onclick = async () => {
-    const file = ui.fin.files[0]; if(!file) return;
-    ui.run.disabled = true;
-    ui.ov.style.display = 'flex';
-    
-    if(!isLoaded) {
-        ui.msg.innerText = "Завантаження модулів...";
-        await ffmpeg.load();
-        isLoaded = true;
-    }
-
-    // Параметри тиші
-    let threshold = mode === 'auto' ? -35 : parseFloat(ui.r_db.value);
-    let silenceDur = 0.45;
-    const limit = Math.pow(10, threshold/20);
-    const blockTime = 1024/sRate;
-    
-    // Пошук пауз
-    const silences = []; let start = null;
-    cRMS.forEach((v, i) => {
-        const t = i * blockTime;
-        if (v < limit) { if (start === null) start = t; }
-        else if (start !== null) {
-            if (t - start >= silenceDur) silences.push({s: start, e: t});
-            start = null;
-        }
-    });
-
-    // Сегменти для склейки
-    const segments = []; let prev = 0, PAD = 0.1;
-    silences.forEach(s => {
-        if(s.s > prev) segments.push({s: Math.max(0, prev-(prev===0?0:PAD)), e: s.s+PAD});
-        prev = s.e;
-    });
-    if(prev < aDur) segments.push({s: Math.max(0, prev-PAD), e: aDur});
-
-    const totalOut = segments.reduce((a,s)=>a+(s.e-s.s), 0);
-    
-    ui.msg.innerText = "Монтаж...";
-    ffmpeg.FS("writeFile", "src.mp4", await fetchFile(file));
-
-    // Створення фільтра (обмежено для стабільності RAM)
-    let filter = ""; let concat = "";
-    const limitSegs = segments.slice(0, 80); // Запобігання вильоту на занадто довгих відео
-    limitSegs.forEach((s, i) => {
-        filter += `[0:v]trim=start=${s.s.toFixed(2)}:end=${s.e.toFixed(2)},setpts=PTS-STARTPTS[v${i}];`;
-        filter += `[0:a]atrim=start=${s.s.toFixed(2)}:end=${s.e.toFixed(2)},asetpts=PTS-STARTPTS[a${i}];`;
-        concat += `[v${i}][a${i}]`;
-    });
-    filter += `${concat}concat=n=${limitSegs.length}:v=1:a=1[v][a]`;
-
-    ffmpeg.setLogger(({message}) => {
-        const m = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
-        if(m){
-            const t = parseInt(m[1])*3600+parseInt(m[2])*60+parseFloat(m[3]);
-            const p = Math.min(100, (t/totalOut)*100);
-            ui.bar.style.width = p+"%";
-            ui.pct.innerText = p.toFixed(0)+"%";
-        }
-    });
-
-    try {
-        // Оптимізовані налаштування для мобільних (libx264 + ultrafast)
-        await ffmpeg.run("-i", "src.mp4", "-filter_complex", filter, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "out.mp4");
-        
-        const data = ffmpeg.FS("readFile", "out.mp4");
-        const url = URL.createObjectURL(new Blob([data.buffer], {type:"video/mp4"}));
-        
-        ui.v_res.src = url;
-        ui.dl.href = url;
-        ui.ov.style.display = 'none';
-        ui.s2.classList.add('hidden');
-        ui.s3.classList.remove('hidden');
-    } catch (e) {
-        alert("Браузеру не вистачило пам'яті. Спробуйте коротше відео.");
-        ui.ov.style.display = 'none';
-    } finally {
-        ui.run.disabled = false;
-        ffmpeg.FS("unlink", "src.mp4");
-    }
-};
+<script src="./ffmpeg/ffmpeg.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
