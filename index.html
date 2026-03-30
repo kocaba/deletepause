@@ -5,43 +5,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pause Remover Pro</title>
   <style>
-    body { margin: 0; font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: #f5f9ff; display: flex; justify-content: center; }
+    :root { --primary: #2b6cff; --success: #00b894; --bg: #f5f9ff; }
+    body { margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); display: flex; justify-content: center; color: #333; }
     .app { width: 100%; max-width: 600px; padding: 20px; }
-    .card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px; box-shadow: 0 5px 20px rgba(0,0,0,0.05); }
-    h2 { text-align: center; margin-bottom: 20px; color: #2b6cff; }
-    input[type="file"] { display: block; width: 100%; padding: 10px; border-radius: 10px; border: 1px solid #ddd; box-sizing: border-box; }
-    label { font-size: 14px; margin-top: 10px; display: block; font-weight: 600; }
-    .slider-value { font-size: 13px; color: #555; margin-top: 4px; }
-    input[type="range"] { width: 100%; cursor: pointer; }
-    button { width: 100%; padding: 14px; border: none; border-radius: 12px; background: #2b6cff; color: white; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.2s; }
+    .card { background: white; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+    h2 { text-align: center; margin-top: 0; color: var(--primary); }
+    input[type="file"] { width: 100%; padding: 10px; border: 1px dashed #ccc; border-radius: 10px; cursor: pointer; box-sizing: border-box; }
+    label { font-size: 14px; margin-top: 15px; display: block; font-weight: bold; }
+    .slider-info { display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-top: 4px; }
+    input[type="range"] { width: 100%; margin-top: 8px; cursor: pointer; }
+    
+    /* Progress Bar Styles */
+    .progress-container { margin: 20px 0; display: none; }
+    .progress-bg { width: 100%; background: #eee; height: 12px; border-radius: 6px; overflow: hidden; }
+    #progressBar { width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease; }
+    #statusText { text-align: center; font-weight: bold; margin-bottom: 5px; font-size: 15px; }
+    #etaText { text-align: center; font-size: 12px; color: #888; margin-top: 5px; }
+
+    button { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--primary); color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
     button:disabled { background: #ccc; cursor: not-allowed; }
-    button:hover:not(:disabled) { background: #1f54cc; }
-    #progress { text-align: center; font-size: 14px; margin-top: 10px; min-height: 1.2em; color: #444; }
-    #waveform { width: 100%; height: 120px; display: block; border-radius: 10px; background: #fafafa; border: 1px solid #eee; }
+    
+    #waveform { width: 100%; height: 120px; background: #fafafa; border-radius: 10px; border: 1px solid #eee; display: block; }
     video { width: 100%; border-radius: 12px; margin-top: 10px; background: #000; }
-    #downloadBtn { display: none; margin-top: 10px; text-align: center; padding: 12px; background: #00b894; color: white; text-decoration: none; border-radius: 12px; font-weight: bold; }
+    #downloadBtn { display: none; margin-top: 12px; text-align: center; padding: 15px; background: var(--success); color: white; text-decoration: none; border-radius: 12px; font-weight: bold; }
   </style>
 </head>
 <body>
 
 <div class="app">
-  <h2>Remove pauses</h2>
-
   <div class="card">
+    <h2>Remove Pauses</h2>
     <input type="file" id="fileInput" accept="video/*">
   </div>
 
   <div class="card">
-    <label>Минимальная тишина (сек)</label>
-    <input type="range" id="duration" min="0.1" max="2" step="0.05" value="0.5">
-    <div class="slider-value" id="durationVal">0.5 сек</div>
+    <label>Минимальная тишина</label>
+    <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
+    <div class="slider-info"><span>Короткие паузы</span><span id="durationVal">0.5 сек</span></div>
 
     <label>Чувствительность (dB)</label>
     <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
-    <div class="slider-value" id="thresholdVal">-35 dB</div>
+    <div class="slider-info"><span>Тише</span><span id="thresholdVal">-35 dB</span></div>
 
-    <button id="processBtn">Обработать видео</button>
-    <div id="progress">Выберите файл для начала</div>
+    <div class="progress-container" id="progCont">
+      <div id="statusText">Ожидание...</div>
+      <div class="progress-bg"><div id="progressBar"></div></div>
+      <div id="etaText">Осталось: -- сек</div>
+    </div>
+
+    <button id="processBtn">Запустить обработку</button>
   </div>
 
   <div class="card">
@@ -50,18 +62,11 @@
 
   <div class="card">
     <video id="preview" controls></video>
-    <a id="downloadBtn" download="cleaned_video.mp4">Скачать результат</a>
+    <a id="downloadBtn" download="no_pauses.mp4">Скачать готовое видео</a>
   </div>
 </div>
 
 <script src="./ffmpeg/ffmpeg.min.js"></script>
 <script src="script.js"></script>
-<script>
-  // Простая связка UI для мгновенного отклика
-  const dInput = document.getElementById("duration");
-  const tInput = document.getElementById("threshold");
-  dInput.addEventListener("input", () => document.getElementById("durationVal").innerText = dInput.value + " сек");
-  tInput.addEventListener("input", () => document.getElementById("thresholdVal").innerText = tInput.value + " dB");
-</script>
 </body>
 </html>
