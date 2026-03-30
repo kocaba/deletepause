@@ -48,7 +48,7 @@ async function loadAudioData(file) {
 
 
 // =========================
-// DETECT SILENCE (точный)
+// DETECT SILENCE
 // =========================
 function detectSilencePCM(thresholdDb, minDuration) {
 
@@ -88,7 +88,7 @@ function detectSilencePCM(thresholdDb, minDuration) {
 
 
 // =========================
-// BUILD SEGMENTS
+// BUILD SEGMENTS (что ОСТАВИТЬ)
 // =========================
 function buildSegments(silences, duration) {
 
@@ -111,7 +111,23 @@ function buildSegments(silences, duration) {
 
 
 // =========================
-// MAIN PROCESS (СТАБИЛЬНЫЙ)
+// BUILD SELECT FILTER
+// =========================
+function buildSelectFilter(segments) {
+
+  // пример:
+  // between(t,0,2)+between(t,3,5)
+
+  const parts = segments.map(s => {
+    return `between(t,${s.start},${s.end})`;
+  });
+
+  return parts.join("+");
+}
+
+
+// =========================
+// MAIN PROCESS
 // =========================
 document.getElementById("processBtn").onclick = async () => {
 
@@ -134,36 +150,17 @@ document.getElementById("processBtn").onclick = async () => {
 
   const segments = buildSegments(silences, audioDuration);
 
-  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
+  const selectExpr = buildSelectFilter(segments);
 
   setStatus("Обработка...");
 
-  let filter = "";
-  let concatInputs = "";
-
-  segments.forEach((s, i) => {
-
-    // ВИДЕО (фикс fps и pts)
-    filter += `[0:v]trim=start=${s.start}:end=${s.end},setpts=PTS-STARTPTS,fps=30[v${i}];`;
-
-    // АУДИО (фикс sync)
-    filter += `[0:a]atrim=start=${s.start}:end=${s.end},asetpts=PTS-STARTPTS,aresample=async=1[a${i}];`;
-
-    concatInputs += `[v${i}][a${i}]`;
-  });
-
-  filter += `${concatInputs}concat=n=${segments.length}:v=1:a=1[outv][outa]`;
+  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
   await ffmpeg.run(
-    "-fflags", "+genpts",
     "-i", "input.mp4",
 
-    "-filter_complex", filter,
-    "-map", "[outv]",
-    "-map", "[outa]",
-
-    "-vsync", "2",
-    "-avoid_negative_ts", "make_zero",
+    "-vf", `select='${selectExpr}',setpts=N/FRAME_RATE/TB`,
+    "-af", `aselect='${selectExpr}',asetpts=N/SR/TB`,
 
     "-c:v", "libx264",
     "-preset", "ultrafast",
