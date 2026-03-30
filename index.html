@@ -3,44 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pause Remover Pro | High Quality</title>
+    <title>High-Quality Pause Remover</title>
     <style>
-        body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #f0f4f8; display: flex; justify-content: center; }
-        .app { width: 100%; max-width: 600px; padding: 20px; }
-        .card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        h2 { text-align: center; color: #2b6cff; margin-top: 0; }
-        input[type="file"] { width: 100%; margin-bottom: 10px; }
-        input[type="range"] { width: 100%; margin: 10px 0; cursor: pointer; }
-        .slider-label { display: flex; justify-content: space-between; font-size: 14px; color: #555; font-weight: 500; }
-        button { width: 100%; padding: 14px; border: none; border-radius: 12px; background: #2b6cff; color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #1a56db; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        #waveform { width: 100%; height: 120px; background: #fafafa; border-radius: 8px; display: block; margin-top: 10px; border: 1px solid #eee; }
-        video { width: 100%; border-radius: 12px; margin-top: 10px; background: #000; }
-        #status { text-align: center; font-size: 14px; margin-top: 10px; color: #666; min-height: 1.2em; font-weight: 500; }
-        #downloadBtn { display: none; text-align: center; padding: 14px; background: #00b894; color: white; text-decoration: none; border-radius: 12px; font-weight: bold; margin-top: 10px; transition: 0.3s; }
-        #downloadBtn:hover { background: #009475; }
-        .progress-container { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 15px; overflow: hidden; }
-        #progressFill { width: 0%; height: 100%; background: #2b6cff; transition: width 0.2s; }
+        :root { --primary: #2b6cff; --bg: #f5f9ff; }
+        body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: var(--bg); display: flex; justify-content: center; color: #333; }
+        .app { width: 100%; max-width: 600px; padding: 20px; box-sizing: border-box; }
+        .card { background: white; border-radius: 20px; padding: 20px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        h2 { text-align: center; margin-top: 0; color: var(--primary); }
+        label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+        .val { float: right; color: var(--primary); font-weight: bold; }
+        input[type="range"] { width: 100%; margin-bottom: 15px; cursor: pointer; }
+        input[type="file"] { width: 100%; padding: 15px; border: 2px dashed #dce4f2; border-radius: 12px; cursor: pointer; }
+        button { width: 100%; padding: 15px; border: none; border-radius: 15px; background: var(--primary); color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: transform 0.1s; }
+        button:active { transform: scale(0.98); }
+        #progress { text-align: center; margin-top: 15px; font-size: 14px; font-weight: 500; }
+        #waveform { width: 100%; height: 120px; background: #fafafa; border-radius: 10px; display: block; }
+        video { width: 100%; border-radius: 15px; background: #000; margin-top: 10px; }
+        #downloadBtn { display: none; margin-top: 15px; text-align: center; padding: 15px; background: #00b894; color: white; text-decoration: none; border-radius: 15px; font-weight: bold; }
     </style>
 </head>
 <body>
+
 <div class="app">
+    <h2>Pause Remover Pro</h2>
+
     <div class="card">
-        <h2>Pause Remover Pro</h2>
         <input type="file" id="fileInput" accept="video/*">
-        
-        <div style="margin-top:15px">
-            <div class="slider-label"><span>Мин. длительность паузы</span><span id="durVal">0.5 сек</span></div>
-            <input type="range" id="duration" min="0.2" max="2" step="0.1" value="0.5">
-            
-            <div class="slider-label"><span>Чувствительность (dB)</span><span id="thrVal">-35 dB</span></div>
-            <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
-        </div>
-        
+    </div>
+
+    <div class="card">
+        <label>Длительность тишины <span class="val" id="durV">0.75с</span></label>
+        <input type="range" id="duration" min="0.1" max="2" step="0.05" value="0.75">
+
+        <label>Чувствительность (dB) <span class="val" id="thrV">-40dB</span></label>
+        <input type="range" id="threshold" min="-60" max="-15" step="1" value="-40">
+
         <button id="processBtn">Обработать видео</button>
-        <div id="status">Загрузите видео файл</div>
-        <div class="progress-container"><div id="progressFill"></div></div>
+        <div id="progress">Ожидание файла...</div>
     </div>
 
     <div class="card">
@@ -49,11 +48,178 @@
 
     <div class="card">
         <video id="preview" controls></video>
-        <a id="downloadBtn" download="processed_video.mp4">Скачать результат (HQ)</a>
+        <a id="downloadBtn" download="result.mp4">Скачать результат</a>
     </div>
 </div>
 
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
-<script src="script.js"></script>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.10.1/dist/ffmpeg.min.js"></script>
+
+<script>
+const { createFFmpeg, fetchFile } = FFmpeg;
+const ffmpeg = createFFmpeg({ log: false });
+
+let isLoaded = false;
+let audioPCM = null;
+let cachedPeaks = [];
+let totalDuration = 0;
+let sampleRate = 44100;
+let wakeLock = null;
+
+const el = (id) => document.getElementById(id);
+
+// --- Инициализация интерфейса ---
+el('duration').oninput = (e) => { el('durV').innerText = e.target.value + 'с'; updateWave(); };
+el('threshold').oninput = (e) => { el('thrV').innerText = e.target.value + 'dB'; updateWave(); };
+
+// --- Оптимизированная загрузка аудио ---
+async function loadAudio(file) {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await file.arrayBuffer();
+    const decoded = await ctx.decodeAudioData(arrayBuffer);
+    
+    audioPCM = decoded.getChannelData(0);
+    totalDuration = decoded.duration;
+    sampleRate = decoded.sampleRate;
+
+    // Генерируем кэш пиков (1000 точек достаточно для любого экрана)
+    cachedPeaks = [];
+    const step = Math.floor(audioPCM.length / 1000);
+    for (let i = 0; i < 1000; i++) {
+        let max = 0;
+        for (let j = 0; j < step; j++) {
+            const val = Math.abs(audioPCM[i * step + j]);
+            if (val > max) max = val;
+        }
+        cachedPeaks.push(max);
+    }
+    updateWave();
+}
+
+// --- Быстрый поиск тишины ---
+function getSilence(thrDb, minDur) {
+    const threshold = Math.pow(10, thrDb / 20);
+    const silences = [];
+    let start = null;
+    
+    // Используем большой шаг для анализа (оптимизация скорости)
+    const step = Math.floor(sampleRate * 0.05); 
+    for (let i = 0; i < audioPCM.length; i += step) {
+        const rms = Math.abs(audioPCM[i]); 
+        const time = i / sampleRate;
+        
+        if (rms < threshold) {
+            if (start === null) start = time;
+        } else {
+            if (start !== null) {
+                if (time - start >= minDur) silences.push({ s: start, e: time });
+                start = null;
+            }
+        }
+    }
+    return silences;
+}
+
+// --- Мгновенная отрисовка waveform ---
+function updateWave() {
+    if (!cachedPeaks.length) return;
+    const canvas = el('waveform');
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width = canvas.offsetWidth;
+    const h = canvas.height = canvas.offsetHeight;
+    
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = '#2b6cff';
+    
+    cachedPeaks.forEach((p, i) => {
+        const x = (i / cachedPeaks.length) * w;
+        const barH = p * h;
+        ctx.fillRect(x, (h - barH) / 2, 1, barH);
+    });
+
+    const sil = getSilence(parseFloat(el('threshold').value), parseFloat(el('duration').value));
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+    sil.forEach(s => {
+        const x1 = (s.s / totalDuration) * w;
+        const x2 = (s.e / totalDuration) * w;
+        ctx.fillRect(x1, 0, x2 - x1, h);
+    });
+}
+
+el('fileInput').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    el('progress').innerText = "Анализ звука...";
+    el('preview').src = URL.createObjectURL(file);
+    await loadAudio(file);
+    el('progress').innerText = "Готов к обработке";
+};
+
+// --- Основной процесс ---
+el('processBtn').onclick = async () => {
+    const file = el('fileInput').files[0];
+    if (!file) return alert("Выберите файл");
+
+    if (!isLoaded) {
+        el('progress').innerText = "Загрузка движка...";
+        await ffmpeg.load();
+        isLoaded = true;
+    }
+
+    try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e) {}
+
+    const silences = getSilence(parseFloat(el('threshold').value), parseFloat(el('duration').value));
+    if (silences.length === 0) return alert("Тишина не найдена с такими настройками");
+
+    // Формируем сегменты (что оставить)
+    let last = 0;
+    const segments = [];
+    const pad = 0.1; // Небольшой запас, чтобы не резать буквы
+    silences.forEach(s => {
+        if (s.s > last) segments.push({ s: last, e: s.s + pad });
+        last = s.e - pad;
+    });
+    if (last < totalDuration) segments.push({ s: last, e: totalDuration });
+
+    el('progress').innerText = "Запуск FFmpeg...";
+    ffmpeg.FS('writeFile', 'in.mp4', await fetchFile(file));
+
+    // Построение сложного фильтра
+    let filter = "";
+    let concat = "";
+    segments.forEach((seg, i) => {
+        filter += `[0:v]trim=start=${seg.s}:end=${seg.e},setpts=PTS-STARTPTS[v${i}];`;
+        filter += `[0:a]atrim=start=${seg.s}:end=${seg.e},asetpts=PTS-STARTPTS[a${i}];`;
+        concat += `[v${i}][a${i}]`;
+    });
+    filter += `${concat}concat=n=${segments.length}:v=1:a=1[ov][oa]`;
+
+    ffmpeg.setLogger(({ message }) => {
+        if (message.includes('time=')) el('progress').innerText = "Рендеринг: " + message.split('time=')[1].split(' ')[0];
+    });
+
+    await ffmpeg.run(
+        '-i', 'in.mp4',
+        '-filter_complex', filter,
+        '-map', '[ov]', '-map', '[oa]',
+        '-preset', 'veryfast', // Оптимальный баланс скорость/качество
+        '-c:v', 'libx264',
+        '-crf', '20',           // Высокое качество (практически оригинал)
+        '-c:a', 'aac',
+        '-b:a', '192k',         // Качественный звук
+        '-sn', '-dn',            // Игнорировать субтитры и мусорные данные
+        'out.mp4'
+    );
+
+    const data = ffmpeg.FS('readFile', 'out.mp4');
+    const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+    
+    el('preview').src = url;
+    el('downloadBtn').href = url;
+    el('downloadBtn').style.display = 'block';
+    el('progress').innerText = "Готово!";
+    if (wakeLock) wakeLock.release();
+};
+</script>
+
 </body>
 </html>
