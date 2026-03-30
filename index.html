@@ -3,40 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pause Remover Pro (Memory Optimized)</title>
+    <title>Pause Remover Pro | High Quality</title>
     <style>
-        body { margin: 0; font-family: -apple-system, sans-serif; background: #f0f4f8; display: flex; justify-content: center; }
+        body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: #f0f4f8; display: flex; justify-content: center; }
         .app { width: 100%; max-width: 600px; padding: 20px; }
         .card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         h2 { text-align: center; color: #2b6cff; margin-top: 0; }
-        input[type="range"] { width: 100%; margin: 10px 0; }
-        .slider-label { display: flex; justify-content: space-between; font-size: 14px; color: #555; }
-        button { width: 100%; padding: 14px; border: none; border-radius: 12px; background: #2b6cff; color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        input[type="file"] { width: 100%; margin-bottom: 10px; }
+        input[type="range"] { width: 100%; margin: 10px 0; cursor: pointer; }
+        .slider-label { display: flex; justify-content: space-between; font-size: 14px; color: #555; font-weight: 500; }
+        button { width: 100%; padding: 14px; border: none; border-radius: 12px; background: #2b6cff; color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        button:hover { background: #1a56db; }
         button:disabled { background: #ccc; cursor: not-allowed; }
-        #waveform { width: 100%; height: 120px; background: #fafafa; border-radius: 8px; display: block; }
+        #waveform { width: 100%; height: 120px; background: #fafafa; border-radius: 8px; display: block; margin-top: 10px; border: 1px solid #eee; }
         video { width: 100%; border-radius: 12px; margin-top: 10px; background: #000; }
-        #status { text-align: center; font-size: 14px; margin-top: 10px; color: #666; min-height: 1.2em; }
-        #downloadBtn { display: none; text-align: center; padding: 14px; background: #00b894; color: white; text-decoration: none; border-radius: 12px; font-weight: bold; margin-top: 10px; }
-        .progress-container { width: 100%; height: 6px; background: #eee; border-radius: 3px; margin-top: 10px; overflow: hidden; }
-        #progressFill { width: 0%; height: 100%; background: #2b6cff; transition: width 0.3s; }
+        #status { text-align: center; font-size: 14px; margin-top: 10px; color: #666; min-height: 1.2em; font-weight: 500; }
+        #downloadBtn { display: none; text-align: center; padding: 14px; background: #00b894; color: white; text-decoration: none; border-radius: 12px; font-weight: bold; margin-top: 10px; transition: 0.3s; }
+        #downloadBtn:hover { background: #009475; }
+        .progress-container { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin-top: 15px; overflow: hidden; }
+        #progressFill { width: 0%; height: 100%; background: #2b6cff; transition: width 0.2s; }
     </style>
 </head>
 <body>
 <div class="app">
     <div class="card">
-        <h2>Pause Remover</h2>
+        <h2>Pause Remover Pro</h2>
         <input type="file" id="fileInput" accept="video/*">
         
         <div style="margin-top:15px">
-            <div class="slider-label"><span>Мин. тишина</span><span id="durVal">0.5 сек</span></div>
+            <div class="slider-label"><span>Мин. длительность паузы</span><span id="durVal">0.5 сек</span></div>
             <input type="range" id="duration" min="0.2" max="2" step="0.1" value="0.5">
             
-            <div class="slider-label"><span>Чувствительность</span><span id="thrVal">-35 dB</span></div>
+            <div class="slider-label"><span>Чувствительность (dB)</span><span id="thrVal">-35 dB</span></div>
             <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
         </div>
         
-        <button id="processBtn">Обработать и сжать</button>
-        <div id="status">Выберите видео файл</div>
+        <button id="processBtn">Обработать видео</button>
+        <div id="status">Загрузите видео файл</div>
         <div class="progress-container"><div id="progressFill"></div></div>
     </div>
 
@@ -46,7 +49,7 @@
 
     <div class="card">
         <video id="preview" controls></video>
-        <a id="downloadBtn" download="result_optimized.mp4">Скачать результат</a>
+        <a id="downloadBtn" download="processed_video.mp4">Скачать результат (HQ)</a>
     </div>
 </div>
 
