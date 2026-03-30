@@ -3,17 +3,18 @@
 // =========================
 const { createFFmpeg, fetchFile } = FFmpeg;
 
-const ffmpeg = createFFmpeg({ log: true });
+const ffmpeg = createFFmpeg({ log: false });
 
 let loaded = false;
-let logs = [];
+
 
 // =========================
-// STATE (новое)
+// STATE
 // =========================
 let audioData = null;
 let audioDuration = 0;
 let sampleRate = 44100;
+
 
 // =========================
 // STATUS
@@ -22,26 +23,21 @@ function setStatus(text) {
   document.getElementById("progress").innerText = text;
 }
 
-// =========================
-// LOGGER
-// =========================
-ffmpeg.setLogger(({ message }) => {
-  logs.push(message);
-});
 
 // =========================
 // LOAD FFMPEG
 // =========================
 async function loadFFmpeg() {
   if (!loaded) {
-    setStatus("Загрузка движка...");
+    setStatus("Загрузка ffmpeg...");
     await ffmpeg.load();
     loaded = true;
   }
 }
 
+
 // =========================
-// LOAD AUDIO (ВАЖНО)
+// LOAD AUDIO (быстро)
 // =========================
 async function loadAudioData(file) {
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -55,29 +51,34 @@ async function loadAudioData(file) {
   sampleRate = decoded.sampleRate;
 }
 
+
 // =========================
-// DETECT SILENCE (БЫСТРО)
+// FAST SILENCE DETECT
 // =========================
 function detectSilencePCM(thresholdDb, minDuration) {
+
   const threshold = Math.pow(10, thresholdDb / 20);
 
-  const windowSize = 1024;
-  const silences = [];
+  // 🔥 увеличили окно = быстрее
+  const windowSize = 4096;
 
+  const silences = [];
   let silenceStart = null;
 
   for (let i = 0; i < audioData.length; i += windowSize) {
+
     let sum = 0;
 
+    // 🔥 быстрее чем RMS
     for (let j = 0; j < windowSize; j++) {
       const sample = audioData[i + j] || 0;
-      sum += sample * sample;
+      sum += Math.abs(sample);
     }
 
-    const rms = Math.sqrt(sum / windowSize);
+    const avg = sum / windowSize;
     const time = i / sampleRate;
 
-    if (rms < threshold) {
+    if (avg < threshold) {
       if (silenceStart === null) silenceStart = time;
     } else {
       if (silenceStart !== null) {
@@ -95,139 +96,12 @@ function detectSilencePCM(thresholdDb, minDuration) {
   return silences;
 }
 
-// =========================
-// DRAW WAVEFORM + SILENCE
-// =========================
-function drawWaveform() {
-  const canvas = document.getElementById("waveform");
-  const ctx = canvas.getContext("2d");
-
-  // адаптив
-  canvas.width = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
-
-  const width = canvas.width;
-  const height = canvas.height;
-
-  const step = Math.ceil(audioData.length / width);
-  const amp = height / 2;
-
-  ctx.clearRect(0, 0, width, height);
-
-  // waveform
-  ctx.fillStyle = "#888";
-
-  for (let i = 0; i < width; i++) {
-    let min = 1;
-    let max = -1;
-
-    for (let j = 0; j < step; j++) {
-      const val = audioData[(i * step) + j] || 0;
-      if (val < min) min = val;
-      if (val > max) max = val;
-    }
-
-    ctx.fillRect(
-      i,
-      (1 + min) * amp,
-      1,
-      Math.max(1, (max - min) * amp)
-    );
-  }
-
-  // берём параметры
-  const threshold = parseFloat(document.getElementById("threshold").value);
-  const duration = parseFloat(document.getElementById("duration").value);
-
-  const silences = detectSilencePCM(threshold, duration);
-
-  // красная подсветка
-  ctx.fillStyle = "rgba(255,0,0,0.3)";
-
-  silences.forEach(s => {
-    const x1 = (s.start / audioDuration) * width;
-    const x2 = (s.end / audioDuration) * width;
-
-    ctx.fillRect(x1, 0, x2 - x1, height);
-  });
-}
-
-// =========================
-// FILE LOAD
-// =========================
-document.getElementById("fileInput").onchange = async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  document.getElementById("preview").src =
-    URL.createObjectURL(file);
-
-  setStatus("Анализ аудио...");
-
-  await loadAudioData(file);
-  drawWaveform();
-
-  setStatus("Готово к обработке");
-};
-
-// =========================
-// LIVE UPDATE
-// =========================
-document.getElementById("threshold").oninput = () => {
-  if (audioData) drawWaveform();
-};
-
-document.getElementById("duration").oninput = () => {
-  if (audioData) drawWaveform();
-};
-
-// =========================
-// RESIZE
-// =========================
-window.addEventListener("resize", () => {
-  if (audioData) drawWaveform();
-});
-
-// =========================
-// PARSE SILENCE (FFMPEG)
-// =========================
-function parseSilence(logs) {
-  const silences = [];
-  let current = null;
-
-  logs.forEach(line => {
-    const start = line.match(/silence_start: (\d+\.?\d*)/);
-    const end = line.match(/silence_end: (\d+\.?\d*)/);
-
-    if (start) current = { start: parseFloat(start[1]) };
-
-    if (end && current) {
-      current.end = parseFloat(end[1]);
-      silences.push(current);
-      current = null;
-    }
-  });
-
-  return silences;
-}
-
-// =========================
-// GET DURATION
-// =========================
-function getDuration(logs) {
-  for (const line of logs) {
-    const m = line.match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
-    if (m) {
-      return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]);
-    }
-  }
-  return 0;
-}
 
 // =========================
 // BUILD SEGMENTS
 // =========================
 function buildSegments(silences, duration) {
+
   const segments = [];
   let prev = 0;
 
@@ -245,67 +119,148 @@ function buildSegments(silences, duration) {
   return segments;
 }
 
+
 // =========================
-// MAIN PROCESS
+// DRAW WAVEFORM
+// =========================
+function drawWaveform() {
+
+  const canvas = document.getElementById("waveform");
+  const ctx = canvas.getContext("2d");
+
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+
+  const width = canvas.width;
+  const height = canvas.height;
+
+  const step = Math.ceil(audioData.length / width);
+  const amp = height / 2;
+
+  ctx.clearRect(0, 0, width, height);
+
+  ctx.fillStyle = "#888";
+
+  for (let i = 0; i < width; i++) {
+
+    let min = 1;
+    let max = -1;
+
+    for (let j = 0; j < step; j++) {
+      const val = audioData[(i * step) + j] || 0;
+      if (val < min) min = val;
+      if (val > max) max = val;
+    }
+
+    ctx.fillRect(
+      i,
+      (1 + min) * amp,
+      1,
+      Math.max(1, (max - min) * amp)
+    );
+  }
+
+  // подсветка тишины
+  const threshold = parseFloat(document.getElementById("threshold").value);
+  const duration = parseFloat(document.getElementById("duration").value);
+
+  const silences = detectSilencePCM(threshold, duration);
+
+  ctx.fillStyle = "rgba(255,0,0,0.3)";
+
+  silences.forEach(s => {
+    const x1 = (s.start / audioDuration) * width;
+    const x2 = (s.end / audioDuration) * width;
+    ctx.fillRect(x1, 0, x2 - x1, height);
+  });
+}
+
+
+// =========================
+// FILE LOAD
+// =========================
+document.getElementById("fileInput").onchange = async (e) => {
+
+  const file = e.target.files[0];
+  if (!file) return;
+
+  document.getElementById("preview").src =
+    URL.createObjectURL(file);
+
+  setStatus("Анализ аудио...");
+
+  await loadAudioData(file);
+  drawWaveform();
+
+  setStatus("Готово");
+};
+
+
+// =========================
+// LIVE UPDATE
+// =========================
+document.getElementById("threshold").oninput = () => {
+  if (audioData) drawWaveform();
+};
+
+document.getElementById("duration").oninput = () => {
+  if (audioData) drawWaveform();
+};
+
+
+// =========================
+// MAIN PROCESS (УЛЬТРА БЫСТРО)
 // =========================
 document.getElementById("processBtn").onclick = async () => {
+
   const file = document.getElementById("fileInput").files[0];
   if (!file) return alert("Выбери файл");
 
   await loadFFmpeg();
 
-  logs = [];
+  setStatus("Анализ тишины...");
 
-  setStatus("Загрузка файла...");
-  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
+  const threshold = parseFloat(document.getElementById("threshold").value);
+  const duration = parseFloat(document.getElementById("duration").value);
 
-  const duration = document.getElementById("duration").value;
-  const threshold = document.getElementById("threshold").value;
-
-  setStatus("Поиск тишины...");
-
-  await ffmpeg.run(
-    "-i", "input.mp4",
-    "-af", `silencedetect=noise=${threshold}dB:d=${duration}`,
-    "-f", "null",
-    "-"
-  );
-
-  const silences = parseSilence(logs);
+  // 🔥 используем JS вместо ffmpeg
+  const silences = detectSilencePCM(threshold, duration);
 
   if (!silences.length) {
     setStatus("Тишина не найдена");
     return;
   }
 
-  const totalDuration = getDuration(logs);
+  const segments = buildSegments(silences, audioDuration);
 
-  let segments = buildSegments(silences, totalDuration);
+  setStatus(`Сегментов: ${segments.length}`);
 
-  const PAD = 0.08;
+  // =====================
+  // ЗАГРУЗКА В FFmpeg
+  // =====================
+  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
-  segments = segments.map(s => ({
-    start: Math.max(0, s.start - PAD),
-    end: s.end + PAD
-  }));
-
-  setStatus(`Найдено сегментов: ${segments.length}`);
-
+  // =====================
+  // РЕЗКА (БЕЗ ПЕРЕКОДА)
+  // =====================
   for (let i = 0; i < segments.length; i++) {
+
     const s = segments[i];
 
-    setStatus(`Сегмент ${i + 1} / ${segments.length}`);
+    setStatus(`Режем ${i + 1}/${segments.length}`);
 
     await ffmpeg.run(
       "-ss", String(s.start),
       "-to", String(s.end),
       "-i", "input.mp4",
-      "-c:v", "libx264",
-      "-c:a", "aac",
+      "-c", "copy", // 🔥 СУПЕР БЫСТРО
       `part${i}.mp4`
     );
   }
 
+  // =====================
+  // СКЛЕЙКА
+  // =====================
   setStatus("Склейка...");
 
   let concatList = "";
@@ -324,8 +279,7 @@ document.getElementById("processBtn").onclick = async () => {
     "-f", "concat",
     "-safe", "0",
     "-i", "list.txt",
-    "-c:v", "libx264",
-    "-c:a", "aac",
+    "-c", "copy",
     "output.mp4"
   );
 
