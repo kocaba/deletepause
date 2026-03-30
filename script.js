@@ -336,3 +336,14 @@ document.getElementById("processBtn").onclick = async () => {
   btn.href = url;
   btn.style.display = "inline";
 };
+
+// =========================
+// LIVE UPDATE (ВАЖНО!)
+// =========================
+document.getElementById("threshold").oninput = () => {
+  if (audioData) drawWaveform();
+};
+
+document.getElementById("duration").oninput = () => {
+  if (audioData) drawWaveform();
+};
