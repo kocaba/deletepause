@@ -1,206 +1,190 @@
 const { createFFmpeg, fetchFile } = FFmpeg;
 
-// Инициализация с логированием
-const ffmpeg = createFFmpeg({ log: true });
+// Инициализация FFmpeg
+const ffmpeg = createFFmpeg({ log: false }); // Отключаем лишний лог в консоль для экономии памяти
 
-let loaded = false;
-let audioData = null;
-let audioDuration = 0;
-let sampleRate = 44100;
+let isLoaded = false;
+let audioBuffer = null;
+let currentObjectURL = null; // Для очистки памяти
 let wakeLock = null;
 
-// Элементы UI
-const elements = {
-    fileInput: document.getElementById("fileInput"),
-    threshold: document.getElementById("threshold"),
-    duration: document.getElementById("duration"),
-    progress: document.getElementById("progress"),
-    preview: document.getElementById("preview"),
-    downloadBtn: document.getElementById("downloadBtn"),
-    processBtn: document.getElementById("processBtn")
+const el = {
+    file: document.getElementById('fileInput'),
+    dur: document.getElementById('duration'),
+    thr: document.getElementById('threshold'),
+    durVal: document.getElementById('durVal'),
+    thrVal: document.getElementById('thrVal'),
+    btn: document.getElementById('processBtn'),
+    status: document.getElementById('status'),
+    progress: document.getElementById('progressFill'),
+    canvas: document.getElementById('waveform'),
+    video: document.getElementById('preview'),
+    download: document.getElementById('downloadBtn')
 };
 
-// --- Вспомогательные функции ---
+// --- Обновление интерфейса ---
+el.dur.oninput = () => { el.durVal.innerText = el.dur.value + " сек"; updateWaveform(); };
+el.thr.oninput = () => { el.thrVal.innerText = el.thr.value + " dB"; updateWaveform(); };
 
-async function enableWakeLock() {
-    if ("wakeLock" in navigator) {
-        try { wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
+// --- Очистка "хвостов" (Memory Cleanup) ---
+function cleanupMemory() {
+    if (currentObjectURL) {
+        URL.revokeObjectURL(currentObjectURL);
+        currentObjectURL = null;
+    }
+    try {
+        // Удаляем файлы из виртуальной памяти FFmpeg, если они там остались
+        ffmpeg.FS('unlink', 'input.mp4');
+        ffmpeg.FS('unlink', 'output.mp4');
+    } catch (e) {
+        // Файлы могли не существовать, это нормально
     }
 }
 
-function setStatus(text) {
-    elements.progress.innerText = text;
-}
-
-// Прогресс теперь считается точнее
-ffmpeg.setLogger(({ message }) => {
-    console.log(message);
-    const match = message.match(/time=(\d+):(\d+):(\d+\.?\d*)/);
-    if (match && audioDuration) {
-        const currentTime = (+match[1] * 3600) + (+match[2] * 60) + (+match[3]);
-        const percent = Math.min(100, (currentTime / audioDuration) * 100);
-        setStatus(`Обработка: ${percent.toFixed(0)}%`);
-    }
-});
-
-// --- Основная логика ---
-
-elements.fileInput.onchange = async (e) => {
+// --- Анализ аудио ---
+el.file.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    elements.preview.src = URL.createObjectURL(file);
-    setStatus("Анализ аудио (это быстро)...");
+    cleanupMemory();
+    el.status.innerText = "Чтение файла...";
+    
+    const url = URL.createObjectURL(file);
+    el.video.src = url;
+    currentObjectURL = url;
 
+    // Декодируем аудио (используем AudioContext для скорости)
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const arrayBuffer = await file.arrayBuffer();
-    const decoded = await audioCtx.decodeAudioData(arrayBuffer);
-
-    audioData = decoded.getChannelData(0);
-    audioDuration = decoded.duration;
-    sampleRate = decoded.sampleRate;
-
-    drawWaveform();
-    setStatus("Готово к быстрой обработке");
+    
+    try {
+        const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+        audioBuffer = decoded.getChannelData(0);
+        updateWaveform();
+        el.status.innerText = "Готово к обработке";
+    } catch (err) {
+        el.status.innerText = "Ошибка аудио: " + err.message;
+    }
 };
 
-function detectSilencePCM(thresholdDb, minDuration) {
-    const threshold = Math.pow(10, thresholdDb / 20);
-    const windowSize = 2048; // Увеличено для скорости анализа
-    const silences = [];
-    let silenceStart = null;
-
-    for (let i = 0; i < audioData.length; i += windowSize) {
-        let sum = 0;
-        for (let j = 0; j < windowSize; j++) {
-            const sample = audioData[i + j] || 0;
-            sum += sample * sample;
+function updateWaveform() {
+    if (!audioBuffer) return;
+    const ctx = el.canvas.getContext('2d');
+    const w = el.canvas.width = el.canvas.offsetWidth;
+    const h = el.canvas.height = 120;
+    
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#2b6cff";
+    
+    const step = Math.ceil(audioBuffer.length / w);
+    for (let i = 0; i < w; i++) {
+        let max = 0;
+        for (let j = 0; j < step; j++) {
+            const val = Math.abs(audioBuffer[i * step + j] || 0);
+            if (val > max) max = val;
         }
-        const rms = Math.sqrt(sum / windowSize);
-        const time = i / sampleRate;
+        ctx.fillRect(i, h / 2 - (max * h / 2), 1, max * h);
+    }
+
+    // Подсветка тишины
+    const silences = getSilences();
+    ctx.fillStyle = "rgba(255, 0, 0, 0.3)";
+    silences.forEach(s => {
+        const x1 = (s.start / (audioBuffer.length / 44100)) * w;
+        const x2 = (s.end / (audioBuffer.length / 44100)) * w;
+        ctx.fillRect(x1, 0, x2 - x1, h);
+    });
+}
+
+function getSilences() {
+    const threshold = Math.pow(10, parseFloat(el.thr.value) / 20);
+    const minDur = parseFloat(el.dur.value);
+    const sr = 44100;
+    const silences = [];
+    let start = null;
+    
+    const step = 2048; 
+    for (let i = 0; i < audioBuffer.length; i += step) {
+        let sum = 0;
+        for (let j = 0; j < step; j++) sum += audioBuffer[i+j] * audioBuffer[i+j];
+        const rms = Math.sqrt(sum / step);
+        const time = i / sr;
 
         if (rms < threshold) {
-            if (silenceStart === null) silenceStart = time;
+            if (start === null) start = time;
         } else {
-            if (silenceStart !== null) {
-                if ((time - silenceStart) >= minDuration) {
-                    silences.push({ start: silenceStart, end: time });
-                }
-                silenceStart = null;
+            if (start !== null) {
+                if (time - start >= minDur) silences.push({start, end: time});
+                start = null;
             }
         }
     }
     return silences;
 }
 
-function drawWaveform() {
-    const canvas = document.getElementById("waveform");
-    const ctx = canvas.getContext("2d");
-    const width = canvas.width = canvas.offsetWidth;
-    const height = canvas.height = canvas.offsetHeight;
+// --- Обработка ---
+el.btn.onclick = async () => {
+    if (!el.file.files[0] || !audioBuffer) return;
+    
+    el.btn.disabled = true;
+    el.status.innerText = "Инициализация...";
+    el.progress.style.width = "0%";
 
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = "#2b6cff";
-
-    const step = Math.ceil(audioData.length / width);
-    const amp = height / 2;
-
-    for (let i = 0; i < width; i++) {
-        let min = 1, max = -1;
-        for (let j = 0; j < step; j++) {
-            const val = audioData[(i * step) + j] || 0;
-            if (val < min) min = val;
-            if (val > max) max = val;
-        }
-        ctx.fillRect(i, (1 + min) * amp, 1, Math.max(1, (max - min) * amp));
-    }
-
-    // Подсветка тишины
-    const silences = detectSilencePCM(parseFloat(elements.threshold.value), parseFloat(elements.duration.value));
-    ctx.fillStyle = "rgba(255, 0, 0, 0.4)";
-    silences.forEach(s => {
-        const x1 = (s.start / audioDuration) * width;
-        const x2 = (s.end / audioDuration) * width;
-        ctx.fillRect(x1, 0, x2 - x1, height);
-    });
-}
-
-// Слушатели ползунков
-elements.threshold.oninput = () => { if(audioData) drawWaveform(); };
-elements.duration.oninput = () => { if(audioData) drawWaveform(); };
-
-// ГЛАВНЫЙ ПРОЦЕСС
-elements.processBtn.onclick = async () => {
-    const file = elements.fileInput.files[0];
-    if (!file || !audioData) return alert("Сначала выберите файл");
-
-    if (!loaded) {
-        setStatus("Загрузка FFmpeg (один раз)...");
+    if (!isLoaded) {
         await ffmpeg.load();
-        loaded = true;
+        isLoaded = true;
     }
 
-    await enableWakeLock();
-    
-    const threshold = parseFloat(elements.threshold.value);
-    const minDur = parseFloat(elements.duration.value);
-    const silences = detectSilencePCM(threshold, minDur);
-    
-    // Создаем сегменты "со звуком"
-    let lastPos = 0;
+    const duration = audioBuffer.length / 44100;
+    const silences = getSilences();
+    let last = 0;
     const segments = [];
-    const PAD = 0.1; // Небольшой отступ, чтобы не резать слова
-
+    
     silences.forEach(s => {
-        if (s.start - lastPos > 0.1) {
-            segments.push({ start: lastPos, end: s.start });
-        }
-        lastPos = s.end;
+        if (s.start - last > 0.1) segments.push({s: last, e: s.start});
+        last = s.end;
     });
-    if (audioDuration - lastPos > 0.1) {
-        segments.push({ start: lastPos, end: audioDuration });
-    }
+    if (duration - last > 0.1) segments.push({s: last, e: duration});
 
-    setStatus(`Склеиваем ${segments.length} фрагментов...`);
+    ffmpeg.FS('writeFile', 'input.mp4', await fetchFile(el.file.files[0]));
 
-    ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
-
-    // ОПТИМИЗИРОВАННЫЙ ФИЛЬТР
-    // Чтобы было БЫСТРО, мы принудительно снижаем разрешение до 720p (опционально)
-    // и используем пресет ultrafast.
+    // ОПТИМИЗАЦИЯ: Уменьшаем разрешение до 720p и битрейт для экономии RAM браузера
     let filter = "";
-    let inputs = "";
-    segments.forEach((s, i) => {
-        const start = Math.max(0, s.start - PAD).toFixed(3);
-        const end = Math.min(audioDuration, s.end + PAD).toFixed(3);
-        
-        filter += `[0:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[v${i}];`;
-        filter += `[0:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS[a${i}];`;
-        inputs += `[v${i}][a${i}]`;
+    let concat = "";
+    segments.forEach((seg, i) => {
+        filter += `[0:v]trim=start=${seg.s}:end=${seg.e},setpts=PTS-STARTPTS,scale=-2:720[v${i}];`;
+        filter += `[0:a]atrim=start=${seg.s}:end=${seg.e},asetpts=PTS-STARTPTS[a${i}];`;
+        concat += `[v${i}][a${i}]`;
+    });
+    filter += `${concat}concat=n=${segments.length}:v=1:a=1[outv][outa]`;
+
+    ffmpeg.setProgress(({ ratio }) => {
+        el.progress.style.width = (ratio * 100) + "%";
+        el.status.innerText = `Рендеринг: ${(ratio * 100).toFixed(0)}%`;
     });
 
-    filter += `${inputs}concat=n=${segments.length}:v=1:a=1[outv][outa]`;
+    try {
+        await ffmpeg.run(
+            '-i', 'input.mp4',
+            '-filter_complex', filter,
+            '-map', '[outv]', '-map', '[outa]',
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '30',
+            '-c:a', 'aac', '-b:a', '96k',
+            'output.mp4'
+        );
 
-    await ffmpeg.run(
-        "-i", "input.mp4",
-        "-filter_complex", filter,
-        "-map", "[outv]",
-        "-map", "[outa]",
-        "-c:v", "libx264",
-        "-preset", "ultrafast", // Максимальная скорость
-        "-crf", "28",           // Оптимальный баланс качества/скорости
-        "-threads", "4",        // Попытка использовать многопоточность
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "output.mp4"
-    );
+        const data = ffmpeg.FS('readFile', 'output.mp4');
+        cleanupMemory(); // Удаляем входной файл из FS сразу после прочтения результата
 
-    const data = ffmpeg.FS("readFile", "output.mp4");
-    const url = URL.createObjectURL(new Blob([data.buffer], { type: "video/mp4" }));
-
-    elements.preview.src = url;
-    elements.downloadBtn.href = url;
-    elements.downloadBtn.style.display = "block";
-    setStatus("Готово!");
-    if (wakeLock) wakeLock.release();
+        const resultUrl = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
+        el.video.src = resultUrl;
+        el.download.href = resultUrl;
+        el.download.style.display = "block";
+        el.status.innerText = "Готово! Видео облегчено.";
+    } catch (err) {
+        el.status.innerText = "Ошибка: недостаточно памяти или файл слишком тяжел.";
+        cleanupMemory();
+    }
+    
+    el.btn.disabled = false;
 };
