@@ -3,15 +3,17 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Remove Pauses</title>
 
 <style>
+* { box-sizing: border-box; }
+
 :root {
   --primary: #2b6cff;
   --bg: #0b0f1a;
 }
 
-/* BODY */
 body {
   margin: 0;
   font-family: -apple-system, sans-serif;
@@ -29,30 +31,20 @@ body {
 /* CARD */
 .card {
   background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 15px;
 }
 
 /* HIDDEN */
-.hidden {
-  display: none;
-}
+.hidden { display: none; }
 
-/* HEADER */
-.logo {
-  font-weight: bold;
-  margin-bottom: 15px;
-  color: var(--primary);
-}
-
-/* FILE */
+/* INPUT */
 input[type="file"] {
   width: 100%;
   padding: 15px;
-  border-radius: 12px;
   border: 1px dashed #444;
+  border-radius: 10px;
   background: transparent;
   color: #aaa;
 }
@@ -63,7 +55,6 @@ input[type="file"] {
   background: #111;
   border-radius: 10px;
   padding: 4px;
-  margin-bottom: 15px;
 }
 
 .tab {
@@ -74,17 +65,11 @@ input[type="file"] {
   border-radius: 8px;
 }
 
-.tab.active {
+.active {
   background: var(--primary);
-  color: #fff;
 }
 
 /* SLIDER */
-label {
-  margin-top: 10px;
-  display: block;
-}
-
 input[type="range"] {
   width: 100%;
 }
@@ -93,27 +78,6 @@ input[type="range"] {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: #aaa;
-}
-
-/* BUTTON */
-button {
-  width: 100%;
-  padding: 15px;
-  border: none;
-  border-radius: 12px;
-  background: var(--primary);
-  color: white;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-/* WAVEFORM */
-#waveform {
-  width: 100%;
-  height: 120px;
-  background: #111;
-  border-radius: 10px;
 }
 
 /* VIDEO */
@@ -125,33 +89,45 @@ button {
 video {
   width: 40%;
   min-width: 220px;
-  border-radius: 12px;
-  background: #000;
 }
 
-/* DOWNLOAD */
-#downloadBtn {
-  display: none;
-  margin-top: 10px;
-  padding: 12px;
-  background: #00b894;
-  text-align: center;
-  border-radius: 10px;
-  color: white;
-  text-decoration: none;
+/* WAVE */
+#waveform {
+  width: 100%;
+  height: 120px;
+  background: #111;
 }
 
-/* PROGRESS */
-.progress-container {
-  margin-top: 15px;
+/* OVERLAY */
+#overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.9);
   display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  z-index: 999;
+}
+
+.loader {
+  width: 60px;
+  height: 60px;
+  border: 4px solid #333;
+  border-top: 4px solid #2b6cff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .progress-bg {
-  width: 100%;
-  background: #222;
+  width: 300px;
   height: 10px;
-  border-radius: 6px;
+  background: #222;
 }
 
 #progressBar {
@@ -164,9 +140,15 @@ video {
 
 <body>
 
-<div class="app">
+<!-- OVERLAY -->
+<div id="overlay">
+  <div class="loader"></div>
+  <div id="statusText">Обработка...</div>
+  <div class="progress-bg"><div id="progressBar"></div></div>
+  <div id="etaText"></div>
+</div>
 
-<div class="logo">Remove pauses</div>
+<div class="app">
 
 <!-- UPLOAD -->
 <div class="card" id="uploadCard">
@@ -176,33 +158,26 @@ video {
 <!-- SETTINGS -->
 <div class="card hidden" id="settingsCard">
 
-  <div class="tabs">
-    <div id="tabAuto" class="tab active">Авто</div>
-    <div id="tabManual" class="tab">Ручной</div>
-  </div>
-
-  <div id="manualControls" style="display:none;">
-    <label>Минимальная тишина</label>
-    <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
-    <div class="slider-info"><span></span><span id="durationVal">0.5 сек</span></div>
-
-    <label>Чувствительность</label>
-    <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
-    <div class="slider-info"><span></span><span id="thresholdVal">-35 dB</span></div>
-  </div>
-
-  <div id="autoInfo">Авто режим подбирает параметры</div>
-
-  <div class="progress-container" id="progCont">
-    <div id="statusText">Ожидание...</div>
-    <div class="progress-bg"><div id="progressBar"></div></div>
-    <div id="etaText">--</div>
-  </div>
-
-  <button id="processBtn">Обработать</button>
+<div class="tabs">
+  <div id="tabAuto" class="tab active">Авто</div>
+  <div id="tabManual" class="tab">Ручной</div>
 </div>
 
-<!-- WAVEFORM -->
+<div id="manualControls" style="display:none;">
+  <input type="range" id="duration" min="0.1" max="2" step="0.05" value="0.5">
+  <div class="slider-info"><span></span><span id="durationVal">0.5</span></div>
+
+  <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
+  <div class="slider-info"><span></span><span id="thresholdVal">-35</span></div>
+</div>
+
+<div id="autoInfo">Авто режим</div>
+
+<button id="processBtn">Обработать</button>
+
+</div>
+
+<!-- WAVE -->
 <div class="card hidden" id="waveCard">
   <canvas id="waveform"></canvas>
 </div>
@@ -212,9 +187,7 @@ video {
   <div class="video-wrap">
     <video id="preview" controls></video>
   </div>
-
-  <a id="downloadBtn" download="no_pauses.mp4">Скачать</a>
-  <button onclick="location.reload()">Новое видео</button>
+  <a id="downloadBtn">Скачать</a>
 </div>
 
 </div>
@@ -223,38 +196,30 @@ video {
 <script src="script.js"></script>
 
 <script>
-/* ================= UI ЛОГИКА (НЕ ЛОМАЕТ SCRIPT.JS) ================= */
-
 const fileInput = document.getElementById("fileInput");
 const settingsCard = document.getElementById("settingsCard");
 const waveCard = document.getElementById("waveCard");
 const videoCard = document.getElementById("videoCard");
+const overlay = document.getElementById("overlay");
 
-/* Показ блоков після загрузки */
+/* ПОКАЗ ПОСЛЕ ЗАГРУЗКИ */
 fileInput.addEventListener("change", () => {
   settingsCard.classList.remove("hidden");
   waveCard.classList.remove("hidden");
   videoCard.classList.remove("hidden");
+
+  /* КРИТИЧНО: ПЕРЕРИСОВКА */
+  setTimeout(() => {
+    if (typeof drawWaveform === "function") drawWaveform();
+  }, 100);
 });
 
-/* вкладки (той же id що у тебе) */
-const tabAuto = document.getElementById("tabAuto");
-const tabManual = document.getElementById("tabManual");
-const manualControls = document.getElementById("manualControls");
-const autoInfo = document.getElementById("autoInfo");
-
-tabAuto.onclick = () => {
-  tabAuto.classList.add("active");
-  tabManual.classList.remove("active");
-  manualControls.style.display = "none";
-  autoInfo.style.display = "block";
-};
-
-tabManual.onclick = () => {
-  tabManual.classList.add("active");
-  tabAuto.classList.remove("active");
-  manualControls.style.display = "block";
-  autoInfo.style.display = "none";
+/* OVERLAY */
+const originalClick = document.getElementById("processBtn").onclick;
+document.getElementById("processBtn").onclick = async function(e) {
+  overlay.style.display = "flex";
+  if (originalClick) await originalClick(e);
+  overlay.style.display = "none";
 };
 </script>
 
