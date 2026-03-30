@@ -1,177 +1,191 @@
 const { createFFmpeg, fetchFile } = FFmpeg;
 
-// Спеціальні налаштування для iPhone (Safari)
+// Спеціальна конфігурація для iPhone (якщо сервер не підтримує SharedArrayBuffer)
 const ffmpeg = createFFmpeg({ 
     log: true, 
-    corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js',
+    corePath: './ffmpeg/ffmpeg-core.js',
     mainName: 'main' 
 });
 
-let audioBufferData = null;
-let cachedRMS = [];
-let audioDuration = 0;
-let sampleRate = 44100;
-let isLoaded = false;
-let currentMode = 'auto';
+let aBuffer = null, cRMS = [], aDur = 0, sRate = 44100, isLoaded = false, cMode = 'auto';
 
-const ui = {
-    fileInput: document.getElementById("fileInput"),
-    stepFile: document.getElementById("step_file"),
-    stepEdit: document.getElementById("step_editor"),
-    stepRes: document.getElementById("step_result"),
-    ov: document.getElementById("ov_scr_55"),
-    pct: document.getElementById("ov_pct"),
-    bar: document.getElementById("p_bar_fill"),
-    status: document.getElementById("statusText"),
-    processBtn: document.getElementById("processBtn"),
-    preview: document.getElementById("preview"),
-    downloadBtn: document.getElementById("downloadBtn"),
-    threshold: document.getElementById("threshold"),
-    duration: document.getElementById("duration"),
-    tabAuto: document.getElementById("tabAuto"),
-    tabManual: document.getElementById("tabManual"),
-    manualControls: document.getElementById("manualControls"),
-    autoInfo: document.getElementById("autoInfo")
+const dom = {
+    fInp: document.getElementById('real_f'),
+    sFile: document.getElementById('step_file'),
+    sEdit: document.getElementById('step_editor'),
+    sRes: document.getElementById('step_result'),
+    ov: document.getElementById('ov_scr_55'),
+    bar: document.getElementById('p_bar_fill'),
+    ovPct: document.getElementById('ov_pct'),
+    cvs: document.getElementById('wv_cvs_11'),
+    btnGo: document.getElementById('go_proc'),
+    vPre: document.getElementById('vid_pre_77'),
+    dl: document.getElementById('dl_btn_99'),
+    db: document.getElementById('val_db'),
+    txtDb: document.getElementById('txt_db')
 };
 
-// Таби
-ui.tabAuto.onclick = () => {
-    currentMode = 'auto';
-    ui.tabAuto.classList.add('active_t');
-    ui.tabManual.classList.remove('active_t');
-    ui.manualControls.style.display = 'none';
-    ui.autoInfo.style.display = 'block';
+// Перемикання табів
+document.getElementById('t_auto').onclick = () => {
+    cMode = 'auto';
+    document.getElementById('t_auto').classList.add('active_t');
+    document.getElementById('t_manual').classList.remove('active_t');
+    document.getElementById('m_cntrls').classList.add('hidden_node');
 };
-ui.tabManual.onclick = () => {
-    currentMode = 'manual';
-    ui.tabManual.classList.add('active_t');
-    ui.tabAuto.classList.remove('active_t');
-    ui.manualControls.style.display = 'block';
-    ui.autoInfo.style.display = 'none';
+document.getElementById('t_manual').onclick = () => {
+    cMode = 'manual';
+    document.getElementById('t_manual').classList.add('active_t');
+    document.getElementById('t_auto').classList.remove('active_t');
+    document.getElementById('m_cntrls').classList.remove('hidden_node');
 };
 
-// Завантаження файлу
-ui.fileInput.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+dom.db.oninput = () => dom.txtDb.innerText = dom.db.value;
 
-    ui.ov.style.display = 'flex';
-    ui.status.innerText = "Аналіз звуку...";
-
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    try {
-        const arrayBuffer = await file.arrayBuffer();
-        const decoded = await audioCtx.decodeAudioData(arrayBuffer);
-        audioBufferData = decoded.getChannelData(0);
-        audioDuration = decoded.duration;
-        sampleRate = decoded.sampleRate;
-
-        // Кэш гучності
-        cachedRMS = [];
-        const step = 2048;
-        for (let i = 0; i < audioBufferData.length; i += step) {
-            let sum = 0;
-            for (let j = 0; j < step; j++) {
-                const s = audioBufferData[i + j] || 0;
-                sum += s * s;
-            }
-            cachedRMS.push(Math.sqrt(sum / step));
-        }
-
-        ui.stepFile.classList.add('hidden_node');
-        ui.stepEdit.classList.remove('hidden_node');
-        ui.preview.src = URL.createObjectURL(file);
-        ui.ov.style.display = 'none';
-        drawWaveform();
-    } catch (err) {
-        alert("Помилка обробки файлу. Спробуйте формат MP4.");
-        ui.ov.style.display = 'none';
-    }
-};
-
-function drawWaveform() {
-    const canvas = document.getElementById("waveform");
-    const ctx = canvas.getContext("2d");
-    const w = canvas.width = canvas.offsetWidth;
-    const h = canvas.height = canvas.offsetHeight;
-    ctx.clearRect(0,0,w,h);
+// Візуалізація
+function draw() {
+    const ctx = dom.cvs.getContext('2d');
+    dom.cvs.width = dom.cvs.clientWidth;
+    dom.cvs.height = dom.cvs.clientHeight;
+    if(!aBuffer) return;
+    const step = Math.ceil(aBuffer.length / dom.cvs.width);
     ctx.fillStyle = "#2b6cff";
-    const step = Math.ceil(audioBufferData.length / w);
-    for (let i = 0; i < w; i++) {
-        let min = 1, max = -1;
-        for (let j = 0; j < step; j++) {
-            const v = audioBufferData[(i * step) + j] || 0;
-            if (v < min) min = v; if (v > max) max = v;
+    for(let i=0; i < dom.cvs.width; i++) {
+        let max = 0;
+        for(let j=0; j<step; j++) {
+            const v = Math.abs(aBuffer[(i*step)+j] || 0);
+            if(v > max) max = v;
         }
-        ctx.fillRect(i, (1 + min) * (h/2), 1, Math.max(1, (max - min) * (h/2)));
+        ctx.fillRect(i, dom.cvs.height/2 - (max * dom.cvs.height/2), 1, max * dom.cvs.height);
     }
 }
 
-ui.processBtn.onclick = async () => {
-    if (!isLoaded) {
-        ui.ov.style.display = 'flex';
-        ui.status.innerText = "Завантаження ядра...";
-        await ffmpeg.load();
-        isLoaded = true;
+// Завантаження файлу
+dom.fInp.onchange = async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+
+    dom.ov.style.display = 'flex';
+    dom.ovPct.innerText = "Завантаження...";
+
+    try {
+        const aCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const arrayBuf = await file.arrayBuffer();
+        const dec = await aCtx.decodeAudioData(arrayBuf);
+        
+        aBuffer = dec.getChannelData(0);
+        aDur = dec.duration;
+        sRate = dec.sampleRate;
+
+        // Швидкий розрахунок RMS
+        cRMS = [];
+        const blockSize = 1024;
+        for (let i = 0; i < aBuffer.length; i += blockSize) {
+            let sum = 0;
+            for (let j = 0; j < blockSize; j++) {
+                const v = aBuffer[i+j] || 0;
+                sum += v*v;
+            }
+            cRMS.push(Math.sqrt(sum/blockSize));
+        }
+
+        dom.sFile.classList.add('hidden_node');
+        dom.sEdit.classList.remove('hidden_node');
+        draw();
+        dom.ov.style.display = 'none';
+    } catch (err) {
+        alert("Помилка при читанні аудіо. Спробуйте інший файл.");
+        dom.ov.style.display = 'none';
+    }
+};
+
+// Обробка
+dom.btnGo.onclick = async () => {
+    const file = dom.fInp.files[0];
+    dom.btnGo.disabled = true;
+    dom.ov.style.display = 'flex';
+
+    if(!isLoaded) {
+        try {
+            await ffmpeg.load();
+            isLoaded = true;
+        } catch (e) {
+            alert("FFmpeg не зміг завантажитись. Перевірте з'єднання або налаштування сервера.");
+            dom.ov.style.display = 'none';
+            dom.btnGo.disabled = false;
+            return;
+        }
     }
 
-    ui.ov.style.display = 'flex';
-    ui.processBtn.disabled = true;
+    const thresholdDB = cMode === 'auto' ? -35 : parseFloat(dom.db.value);
+    const minSilence = 0.5;
+    const limit = Math.pow(10, thresholdDB/20);
+    const sil = [];
+    let st = null;
+    const blockTime = 1024/sRate;
 
-    const db = currentMode === 'auto' ? -35 : parseFloat(ui.threshold.value);
-    const dur = currentMode === 'auto' ? 0.5 : parseFloat(ui.duration.value);
-    const limit = Math.pow(10, db / 20);
-    
-    // Пошук пауз
-    const silences = [];
-    let start = null;
-    const secPerBlock = 2048 / sampleRate;
-    cachedRMS.forEach((v, i) => {
-        const time = i * secPerBlock;
-        if (v < limit) { if (start === null) start = time; }
-        else if (start !== null) {
-            if (time - start >= dur) silences.push({ start, end: time });
-            start = null;
+    cRMS.forEach((v, i) => {
+        const t = i * blockTime;
+        if (v < limit) { if (st === null) st = t; }
+        else if (st !== null) { 
+            if (t - st >= minSilence) sil.push({st, en: t}); 
+            st = null; 
         }
     });
 
-    const segments = [];
-    let prev = 0;
-    silences.forEach(s => {
-        if (s.start > prev) segments.push({ s: Math.max(0, prev - 0.1), e: s.start + 0.1 });
-        prev = s.end;
+    // Формуємо сегменти
+    const segs = [];
+    let prev = 0, PAD = 0.1;
+    sil.forEach(s => {
+        if(s.st > prev) segs.push({s: Math.max(0, prev - (prev===0?0:PAD)), e: s.st + PAD});
+        prev = s.en;
     });
-    if (prev < audioDuration) segments.push({ s: prev - 0.1, e: audioDuration });
+    if(prev < aDur) segs.push({s: Math.max(0, prev - PAD), e: aDur});
 
-    const totalOut = segments.reduce((a, s) => a + (s.e - s.s), 0);
-    ffmpeg.FS("writeFile", "in.mp4", await fetchFile(ui.fileInput.files[0]));
+    const tOut = segs.reduce((a,s) => a + (s.e - s.s), 0);
+    
+    ffmpeg.FS("writeFile", "in.mp4", await fetchFile(file));
 
-    let filter = ""; let concat = "";
-    segments.forEach((s, i) => {
-        filter += `[0:v]trim=start=${s.s.toFixed(2)}:end=${s.e.toFixed(2)},setpts=PTS-STARTPTS[v${i}];`;
-        filter += `[0:a]atrim=start=${s.s.toFixed(2)}:end=${s.e.toFixed(2)},asetpts=PTS-STARTPTS[a${i}];`;
+    let filter = "";
+    let concat = "";
+    segs.forEach((s, i) => {
+        filter += `[0:v]trim=start=${s.s.toFixed(3)}:end=${s.e.toFixed(3)},setpts=PTS-STARTPTS[v${i}];`;
+        filter += `[0:a]atrim=start=${s.s.toFixed(3)}:end=${s.e.toFixed(3)},asetpts=PTS-STARTPTS[a${i}];`;
         concat += `[v${i}][a${i}]`;
     });
-    filter += `${concat}concat=n=${segments.length}:v=1:a=1[ov][oa]`;
+    filter += `${concat}concat=n=${segs.length}:v=1:a=1[v][a]`;
 
-    ffmpeg.setLogger(({ message }) => {
-        const match = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
-        if (match) {
-            const time = parseInt(match[1])*3600 + parseInt(match[2])*60 + parseFloat(match[3]);
-            const p = Math.round((time / totalOut) * 100);
-            ui.bar.style.width = p + "%";
-            ui.pct.innerText = p + "%";
+    ffmpeg.setLogger(({message}) => {
+        const m = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
+        if(m) {
+            const t = parseInt(m[1])*3600 + parseInt(m[2])*60 + parseFloat(m[3]);
+            const pct = Math.min(99, (t/tOut)*100);
+            dom.bar.style.width = pct + "%";
+            dom.ovPct.innerText = pct.toFixed(0) + "%";
         }
     });
 
-    await ffmpeg.run("-i", "in.mp4", "-filter_complex", filter, "-map", "[ov]", "-map", "[oa]", "-c:v", "libx264", "-preset", "ultrafast", "out.mp4");
-
-    const data = ffmpeg.FS("readFile", "out.mp4");
-    const url = URL.createObjectURL(new Blob([data.buffer], { type: "video/mp4" }));
-    ui.preview.src = url;
-    ui.downloadBtn.href = url;
-    ui.downloadBtn.style.display = "block";
-    ui.ov.style.display = 'none';
-    ui.stepEdit.classList.add('hidden_node');
-    ui.stepRes.classList.remove('hidden_node');
+    try {
+        // Оптимізовано для мобільних: ultrafast та crf 28 (менше навантаження)
+        await ffmpeg.run("-i", "in.mp4", "-filter_complex", filter, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "out.mp4");
+        
+        const data = ffmpeg.FS("readFile", "out.mp4");
+        const blob = new Blob([data.buffer], {type:"video/mp4"});
+        const url = URL.createObjectURL(blob);
+        
+        dom.vPre.src = url;
+        dom.dl.href = url;
+        dom.dl.style.display = "block";
+        dom.ov.style.display = 'none';
+        dom.sEdit.classList.add('hidden_node');
+        dom.sRes.classList.remove('hidden_node');
+        
+        // Очищення пам'яті FFmpeg
+        ffmpeg.FS("unlink", "in.mp4");
+        ffmpeg.FS("unlink", "out.mp4");
+    } catch (e) {
+        alert("Помилка при обробці відео.");
+        dom.ov.style.display = 'none';
+    } finally {
+        dom.btnGo.disabled = false;
+    }
 };
