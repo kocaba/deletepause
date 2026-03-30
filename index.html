@@ -1,276 +1,339 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pause Remover Pro - Ultra</title>
-    <style>
-        :root { --p-clr: #2b6cff; --s-clr: #00b894; --b-clr: #000; }
-        * { box-sizing: border-box; }
-        body { 
-            margin: 0; font-family: -apple-system, sans-serif; background: var(--b-clr); 
-            display: flex; justify-content: center; color: #333; min-height: 100vh;
-        }
-        .bg_fx_99 {
-            position: fixed; width: 600px; height: 600px;
-            background: radial-gradient(circle, #1e3a8a 0%, rgba(0,0,0,0) 70%);
-            border-radius: 50%; filter: blur(80px); z-index: -1; top: 10%; left: -10%;
-        }
-        .main_app_v3 { width: 100%; max-width: 600px; padding: 20px; z-index: 1; }
-        .card_shd_42 { 
-            background: rgba(255, 255, 255, 0.98); border-radius: 20px; padding: 20px; 
-            margin-bottom: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
-        }
-        h2 { text-align: center; margin-top: 0; color: var(--p-clr); }
-        .f_inp_88 { width: 100%; padding: 20px; border: 2px dashed #ccc; border-radius: 12px; cursor: pointer; background: #fff; text-align: center; }
-        
-        /* Overlay System */
-        #ov_scr_55 {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 9999; flex-direction: column;
-            justify-content: center; align-items: center; color: white; text-align: center;
-        }
-        .p_bar_bg { width: 80%; max-width: 400px; height: 12px; background: #333; border-radius: 6px; overflow: hidden; margin: 20px 0; }
-        #p_bar_fill { width: 0%; height: 100%; background: var(--p-clr); transition: 0.3s; }
-        
-        /* Editor elements */
-        .tabs_row { display: flex; background: #eee; border-radius: 10px; padding: 4px; margin-bottom: 15px; }
-        .tab_btn { flex: 1; text-align: center; padding: 10px; cursor: pointer; border-radius: 8px; font-weight: bold; transition: 0.2s; }
-        .active_t { background: var(--p-clr); color: white; }
-        
-        label { font-size: 13px; font-weight: bold; margin-top: 10px; display: block; }
-        input[type="range"] { width: 100%; cursor: pointer; margin: 10px 0; }
-        .info_box { padding: 12px; font-size: 14px; background: #f0f7ff; border-radius: 10px; border: 1px solid #d0e0ff; margin-bottom: 10px; }
-        
-        #wv_cvs_11 { width: 100%; height: 130px; background: #fafafa; border-radius: 10px; border: 1px solid #eee; display: block; margin: 15px 0; }
-        .v_pre_cnt { display: flex; justify-content: center; width: 100%; background: #000; border-radius: 12px; overflow: hidden; }
-        #vid_pre_77 { width: 40% !important; min-width: 200px; }
-        
-        .btn_prim { width: 100%; padding: 16px; border: none; border-radius: 14px; background: var(--p-clr); color: white; font-size: 16px; font-weight: bold; cursor: pointer; }
-        .btn_prim:disabled { background: #555; cursor: wait; }
-        #dl_btn_99 { display: none; margin-top: 12px; text-align: center; padding: 16px; background: var(--s-clr); color: white; text-decoration: none; border-radius: 14px; font-weight: bold; }
-        
-        .hidden_node { display: none !important; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pause Remover Pro</title>
+  <style>
+    :root { --primary: #2b6cff; --success: #00b894; --bg: #f5f9ff; }
+    body { margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); display: flex; justify-content: center; color: #333; }
+    .app { width: 100%; max-width: 600px; padding: 20px; }
+    .card { background: white; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+    h2 { text-align: center; margin-top: 0; color: var(--primary); }
+    input[type="file"] { width: 100%; padding: 10px; border: 1px dashed #ccc; border-radius: 10px; cursor: pointer; box-sizing: border-box; }
+    label { font-size: 14px; margin-top: 15px; display: block; font-weight: bold; }
+    .slider-info { display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-top: 4px; }
+    input[type="range"] { width: 100%; margin-top: 8px; cursor: pointer; }
+    
+    .progress-container { margin: 20px 0; display: none; }
+    .progress-bg { width: 100%; background: #eee; height: 12px; border-radius: 6px; overflow: hidden; position: relative; }
+    #progressBar { width: 0%; height: 100%; background: var(--primary); transition: width 0.3s linear; }
+    #statusText { text-align: center; font-weight: bold; margin-bottom: 5px; font-size: 15px; }
+    #etaText { text-align: center; font-size: 12px; color: #888; margin-top: 5px; }
+
+    button { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--primary); color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    
+    #waveform { width: 100%; height: 120px; background: #fafafa; border-radius: 10px; border: 1px solid #eee; display: block; }
+    video { width: 100%; border-radius: 12px; margin-top: 10px; background: #000; }
+    #downloadBtn { display: none; margin-top: 12px; text-align: center; padding: 15px; background: var(--success); color: white; text-decoration: none; border-radius: 12px; font-weight: bold; }
+  </style>
 </head>
 <body>
 
-<div class="bg_fx_99"></div>
+<div class="app">
+  <div class="card">
+    <h2>Remove Pauses</h2>
+    <input type="file" id="fileInput" accept="video/*">
+  </div>
 
-<div id="ov_scr_55">
-    <h2 style="color:white" id="ov_title">Обробка...</h2>
-    <div id="ov_pct" style="font-size: 50px; font-weight: 900; color: var(--p-clr);">0%</div>
-    <div class="p_bar_bg"><div id="p_bar_fill"></div></div>
-    <div id="ov_eta" style="opacity: 0.7;">Розрахунок часу...</div>
-</div>
-
-<div class="main_app_v3">
-    <div class="card_shd_42" id="step_file">
-        <h2>Pause Remover Pro</h2>
-        <div class="f_inp_88" onclick="document.getElementById('real_f').click()">
-            Натисніть або перетягніть відео сюди
-            <input type="file" id="real_f" accept="video/*" style="display:none">
-        </div>
+  <div class="card">
+    <div style="display: flex; background: #eee; border-radius: 10px; padding: 4px; margin-bottom: 15px;">
+      <div id="tabAuto" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px; background: var(--primary); color: white; font-weight: bold;">Авто</div>
+      <div id="tabManual" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px;">Вручную</div>
     </div>
 
-    <div class="card_shd_42 hidden_node" id="step_editor">
-        <div class="tabs_row">
-            <div id="t_auto" class="tab_btn active_t">Авто</div>
-            <div id="t_manual" class="tab_btn">Вручну</div>
-        </div>
+    <div id="manualControls" style="display: none;">
+      <label>Минимальная тишина</label>
+      <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
+      <div class="slider-info"><span>Короткие паузы</span><span id="durationVal">0.5 сек</span></div>
 
-        <div id="m_cntrls" class="hidden_node">
-            <label>Мінімальна тиша</label>
-            <input type="range" id="val_dur" min="0.1" max="2.0" step="0.05" value="0.5">
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:#666"><span>Чутливість</span><span id="txt_dur">0.5 сек</span></div>
-            
-            <label>Поріг шуму (dB)</label>
-            <input type="range" id="val_db" min="-60" max="-10" step="1" value="-35">
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:#666"><span>Тиша</span><span id="txt_db">-35 dB</span></div>
-        </div>
-
-        <div id="a_info" class="info_box">✨ Параметри підбираються автоматично під ваш звук.</div>
-
-        <canvas id="wv_cvs_11"></canvas>
-        <button id="go_proc" class="btn_prim">Запустити видалення пауз</button>
+      <label>Чувствительность (dB)</label>
+      <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
+      <div class="slider-info"><span>Тише</span><span id="thresholdVal">-35 dB</span></div>
     </div>
 
-    <div class="card_shd_42 hidden_node" id="step_result">
-        <div class="v_pre_cnt">
-            <video id="vid_pre_77" controls></video>
-        </div>
-        <a id="dl_btn_99" download="result.mp4">Скачати результат</a>
-        <button class="btn_prim" style="background:#555;margin-top:10px" onclick="location.reload()">Обробити інше відео</button>
+    <div id="autoInfo" style="padding: 10px; font-size: 14px; background: #f0f7ff; border-radius: 10px; border: 1px solid #d0e0ff; margin-bottom: 10px;">
+      ✨ Режим «Авто» подберет настройки под ваш звук.
     </div>
+
+    <div class="progress-container" id="progCont">
+      <div id="statusText">Ожидание...</div>
+      <div class="progress-bg"><div id="progressBar"></div></div>
+      <div id="etaText">Осталось: -- сек</div>
+    </div>
+
+    <button id="processBtn">Запустить обработку</button>
+  </div>
+
+  <div class="card">
+    <canvas id="waveform"></canvas>
+  </div>
+
+  <div class="card">
+    <video id="preview" controls></video>
+    <a id="downloadBtn" download="no_pauses.mp4">Скачать готовое видео</a>
+  </div>
 </div>
 
 <script src="./ffmpeg/ffmpeg.min.js"></script>
 <script>
-// ==========================================================
-// СКРИПТ (ПОВНІСТЮ ОНОВЛЕНИЙ І СИНХРОНІЗОВАНИЙ)
-// ==========================================================
 const { createFFmpeg, fetchFile } = FFmpeg;
-const ffmpeg = createFFmpeg({ log: false, corePath: './ffmpeg/ffmpeg-core.js' });
+const ffmpeg = createFFmpeg({ 
+    log: true, // Включено для отладки прогресса
+    corePath: './ffmpeg/ffmpeg-core.js' 
+});
 
-let aBuffer = null, cRMS = [], aDur = 0, sRate = 44100, isLoaded = false, cMode = 'auto';
+let audioBufferData = null;
+let cachedRMS = [];
+let audioDuration = 0;
+let sampleRate = 44100;
+let isLoaded = false;
+let currentMode = 'auto';
 
-const dom = {
-    fInp: document.getElementById('real_f'),
-    sFile: document.getElementById('step_file'),
-    sEdit: document.getElementById('step_editor'),
-    sRes: document.getElementById('step_result'),
-    ov: document.getElementById('ov_scr_55'),
-    bar: document.getElementById('p_bar_fill'),
-    ovPct: document.getElementById('ov_pct'),
-    ovEta: document.getElementById('ov_eta'),
-    cvs: document.getElementById('wv_cvs_11'),
-    btnGo: document.getElementById('go_proc'),
-    vPre: document.getElementById('vid_pre_77'),
-    dl: document.getElementById('dl_btn_99'),
-    dur: document.getElementById('val_dur'),
-    db: document.getElementById('val_db')
+const ui = {
+    duration: document.getElementById("duration"),
+    threshold: document.getElementById("threshold"),
+    durationVal: document.getElementById("durationVal"),
+    thresholdVal: document.getElementById("thresholdVal"),
+    processBtn: document.getElementById("processBtn"),
+    progCont: document.getElementById("progCont"),
+    progressBar: document.getElementById("progressBar"),
+    statusText: document.getElementById("statusText"),
+    etaText: document.getElementById("etaText"),
+    downloadBtn: document.getElementById("downloadBtn"),
+    preview: document.getElementById("preview"),
+    autoInfo: document.getElementById("autoInfo"),
+    manualControls: document.getElementById("manualControls"),
+    tabAuto: document.getElementById("tabAuto"),
+    tabManual: document.getElementById("tabManual")
 };
 
-// ТАБИ
-function setTab(m) {
-    cMode = m;
-    document.getElementById('t_auto').classList.toggle('active_t', m === 'auto');
-    document.getElementById('t_manual').classList.toggle('active_t', m === 'manual');
-    document.getElementById('m_cntrls').classList.toggle('hidden_node', m === 'auto');
-    document.getElementById('a_info').classList.toggle('hidden_node', m === 'manual');
-    if (aBuffer) draw();
-}
-document.getElementById('t_auto').onclick = () => setTab('auto');
-document.getElementById('t_manual').onclick = () => setTab('manual');
+const WINDOW_SIZE = 1024;
 
-// АНАЛІЗ
-function preRMS() {
-    cRMS = []; const step = 1024;
-    for (let i = 0; i < aBuffer.length; i += step) {
-        let s = 0;
-        for (let j = 0; j < step; j++) { const v = aBuffer[i+j]||0; s += v*v; }
-        cRMS.push(Math.sqrt(s/step));
+function switchTab(mode) {
+    currentMode = mode;
+    ui.tabAuto.style.background = mode === 'auto' ? '#2b6cff' : 'none';
+    ui.tabAuto.style.color = mode === 'auto' ? 'white' : '#333';
+    ui.tabManual.style.background = mode === 'manual' ? '#2b6cff' : 'none';
+    ui.tabManual.style.color = mode === 'manual' ? 'white' : '#333';
+    ui.manualControls.style.display = mode === 'manual' ? 'block' : 'none';
+    ui.autoInfo.style.display = mode === 'auto' ? 'block' : 'none';
+    if (audioBufferData) drawWaveform();
+}
+
+ui.tabAuto.onclick = () => switchTab('auto');
+ui.tabManual.onclick = () => switchTab('manual');
+
+function precalculateRMS() {
+    cachedRMS = [];
+    for (let i = 0; i < audioBufferData.length; i += WINDOW_SIZE) {
+        let sum = 0;
+        for (let j = 0; j < WINDOW_SIZE; j++) {
+            const s = audioBufferData[i + j] || 0;
+            sum += s * s;
+        }
+        cachedRMS.push(Math.sqrt(sum / WINDOW_SIZE));
     }
 }
 
-function getAuto() {
-    const s = [...cRMS].sort((a,b)=>a-b);
-    const n = s[Math.floor(s.length*0.1)] || 0.001;
-    let db = Math.round(20 * Math.log10(n + 1e-6) + 8);
-    return { db: Math.min(-30, Math.max(-45, db)), dur: aDur > 60 ? 0.6 : 0.45 };
+function getAutoParams() {
+    if (!cachedRMS.length) return { db: -35, dur: 0.5 };
+    const sorted = [...cachedRMS].sort((a, b) => a - b);
+    const noiseLevel = sorted[Math.floor(sorted.length * 0.1)] || 0.001;
+    let autoDb = Math.round(20 * Math.log10(noiseLevel + 1e-6) + 8);
+    if (autoDb < -50) autoDb = -45;
+    if (autoDb > -25) autoDb = -30;
+    let autoDur = audioDuration > 60 ? 0.6 : 0.45;
+    return { db: autoDb, dur: autoDur };
 }
 
-function findS(db, dur) {
-    const lim = Math.pow(10, db/20), res = []; let st = null;
-    const bT = 1024/sRate;
-    cRMS.forEach((v, i) => {
-        const t = i * bT;
-        if (v < lim) { if (st === null) st = t; }
-        else if (st !== null) { if (t - st >= dur) res.push({st, en: t}); st = null; }
-    });
-    return res;
+function detectSilenceFast(db, minDur) {
+    const limit = Math.pow(10, db / 20);
+    const silences = [];
+    let start = null;
+    const secPerBlock = WINDOW_SIZE / sampleRate;
+    for (let i = 0; i < cachedRMS.length; i++) {
+        const time = i * secPerBlock;
+        if (cachedRMS[i] < limit) {
+            if (start === null) start = time;
+        } else if (start !== null) {
+            if (time - start >= minDur) silences.push({ start, end: time });
+            start = null;
+        }
+    }
+    return silences;
 }
 
-function draw() {
-    const ctx = dom.cvs.getContext('2d');
-    const w = dom.cvs.width = dom.cvs.offsetWidth;
-    const h = dom.cvs.height = dom.cvs.offsetHeight;
-    ctx.clearRect(0,0,w,h);
-    const step = Math.ceil(aBuffer.length/w);
+function drawWaveform() {
+    if (!audioBufferData) return;
+    
+    const canvas = document.getElementById("waveform");
+    const ctx = canvas.getContext("2d");
+    
+    // Важно: принудительно обновляем ширину
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+    
+    const w = canvas.width;
+    const h = canvas.height;
+
+    ctx.clearRect(0, 0, w, h);
+    const step = Math.ceil(audioBufferData.length / w);
     ctx.fillStyle = "#2b6cff";
-    for(let i=0; i<w; i++){
-        let min=1, max=-1;
-        for(let j=0; j<step; j++){
-            const v = aBuffer[(i*step)+j]||0;
-            if(v<min) min=v; if(v>max) max=v;
+    
+    for (let i = 0; i < w; i++) {
+        let min = 1, max = -1;
+        for (let j = 0; j < step; j++) {
+            const val = audioBufferData[(i * step) + j] || 0;
+            if (val < min) min = val;
+            if (val > max) max = val;
         }
-        ctx.fillRect(i, (1+min)*(h/2), 1, Math.max(1,(max-min)*(h/2)));
+        ctx.fillRect(i, (1 + min) * (h/2), 1, Math.max(1, (max - min) * (h/2)));
     }
-    const p = cMode==='auto' ? getAuto() : {db: parseFloat(dom.db.value), dur: parseFloat(dom.dur.value)};
-    if(cMode==='auto') document.getElementById('a_info').innerText = `✨ Авто: ${p.db}dB, ${p.dur}s`;
-    const sil = findS(p.db, p.dur);
+
+    let db, dur;
+    if (currentMode === 'auto') {
+        const auto = getAutoParams();
+        db = auto.db; dur = auto.dur;
+        ui.autoInfo.innerText = `✨ Авто: Порог ${db}dB, Мин. тишина ${dur}сек`;
+    } else {
+        db = parseFloat(ui.threshold.value);
+        dur = parseFloat(ui.duration.value);
+    }
+
+    const silences = detectSilenceFast(db, dur);
     ctx.fillStyle = "rgba(255, 50, 50, 0.4)";
-    sil.forEach(s => {
-        const x1 = (s.st/aDur)*w, x2 = (s.en/aDur)*w;
-        ctx.fillRect(x1, 0, x2-x1, h);
+    silences.forEach(s => {
+        const x1 = (s.start / audioDuration) * w;
+        const x2 = (s.end / audioDuration) * w;
+        ctx.fillRect(x1, 0, x2 - x1, h);
     });
 }
 
-// ПЕРЕБІГ
-dom.fInp.onchange = async (e) => {
-    const file = e.target.files[0]; if(!file) return;
-    dom.ov.style.display = 'flex'; dom.ov_pct = "Декодування...";
+document.getElementById("fileInput").onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    ui.statusText.innerText = "Декодирование аудио...";
+    ui.progCont.style.display = "block";
     
-    const aCtx = new AudioContext();
-    const dec = await aCtx.decodeAudioData(await file.arrayBuffer());
-    aBuffer = dec.getChannelData(0); aDur = dec.duration; sRate = dec.sampleRate;
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await file.arrayBuffer();
+    const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+
+    audioBufferData = decoded.getChannelData(0);
+    audioDuration = decoded.duration;
+    sampleRate = decoded.sampleRate;
+
+    precalculateRMS();
     
-    preRMS(); draw();
-    dom.vPre.src = URL.createObjectURL(file);
-    dom.ov.style.display = 'none';
-    dom.sFile.classList.add('hidden_node');
-    dom.sEdit.classList.remove('hidden_node');
+    // Задержка чтобы браузер успел отрисовать контейнер
+    setTimeout(() => {
+        drawWaveform();
+        ui.statusText.innerText = "Готово к обработке";
+    }, 100);
+    
+    ui.preview.src = URL.createObjectURL(file);
 };
 
-dom.dur.oninput = () => { document.getElementById('txt_dur').innerText = dom.dur.value+" сек"; draw(); };
-dom.db.oninput = () => { document.getElementById('txt_db').innerText = dom.db.value+" dB"; draw(); };
+ui.duration.oninput = () => { ui.durationVal.innerText = ui.duration.value + " сек"; drawWaveform(); };
+ui.threshold.oninput = () => { ui.thresholdVal.innerText = ui.threshold.value + " dB"; drawWaveform(); };
 
-dom.btnGo.onclick = async () => {
-    const file = dom.fInp.files[0]; if(!file) return;
-    dom.btnGo.disabled = true;
-    dom.ov.style.display = 'flex';
-    
-    if(!isLoaded) { 
-        document.getElementById('ov_title').innerText = "Завантаження ядра...";
-        await ffmpeg.load(); isLoaded = true; 
-    }
-    
-    const p = cMode==='auto' ? getAuto() : {db: parseFloat(dom.db.value), dur: parseFloat(dom.dur.value)};
-    const sil = findS(p.db, p.dur);
-    const segs = []; let prev = 0, PAD = 0.1;
-    sil.forEach(s => {
-        if(s.st > prev) segs.push({s: Math.max(0, prev-(prev===0?0:PAD)), e: s.st+PAD});
-        prev = s.en;
-    });
-    if(prev < aDur) segs.push({s: prev-PAD, e: aDur});
-    
-    const tOut = segs.reduce((a,s)=>a+(s.e-s.s), 0);
-    ffmpeg.FS("writeFile", "src.mp4", await fetchFile(file));
-    
-    let f = "", c = "";
-    segs.forEach((s, i) => {
-        f += `[0:v]trim=start=${s.s.toFixed(3)}:end=${s.e.toFixed(3)},setpts=PTS-STARTPTS[v${i}];`;
-        f += `[0:a]atrim=start=${s.s.toFixed(3)}:end=${s.e.toFixed(3)},asetpts=PTS-STARTPTS[a${i}];`;
-        c += `[v${i}][a${i}]`;
-    });
-    f += `${c}concat=n=${segs.length}:v=1:a=1[v][a]`;
+let totalOutDur = 0;
+let startTime = 0;
 
-    let startT = Date.now();
-    ffmpeg.setLogger(({message}) => {
-        const m = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
-        if(m){
-            const t = parseInt(m[1])*3600+parseInt(m[2])*60+parseFloat(m[3]);
-            const pct = Math.min(100, (t/tOut)*100);
-            dom.bar.style.width = pct+"%";
-            dom.ovPct.innerText = pct.toFixed(0)+"%";
-            const elap = (Date.now()-startT)/1000;
-            const eta = Math.round((tOut-t)/(t/elap));
-            dom.ov_eta.innerText = eta > 0 ? `Залишилось: ${eta} сек` : "Фіналізація...";
+ffmpeg.setLogger(({ message }) => {
+    // Улучшенный регулярный запрос для времени ffmpeg
+    const match = message.match(/time=(\d{2}):(\d{2}):(\d{2}\.\d{2})/);
+    if (match && totalOutDur > 0) {
+        const time = parseInt(match[1])*3600 + parseInt(match[2])*60 + parseFloat(match[3]);
+        const percent = Math.min(99.9, (time / totalOutDur) * 100);
+        
+        ui.progressBar.style.width = percent + "%";
+        ui.statusText.innerText = `Обработка: ${percent.toFixed(1)}%`;
+
+        const elapsed = (Date.now() - startTime) / 1000;
+        if (time > 0.1) {
+            const eta = Math.round((totalOutDur - time) / (time / elapsed));
+            if (eta >= 0) ui.etaText.innerText = `Осталось примерно: ${eta} сек.`;
         }
-    });
+    }
+});
 
-    document.getElementById('ov_title').innerText = "Йде обробка відео...";
-    await ffmpeg.run("-i", "src.mp4", "-filter_complex", f, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "res.mp4");
+ui.processBtn.onclick = async () => {
+    const file = document.getElementById("fileInput").files[0];
+    if (!file || !audioBufferData) return alert("Файл не выбран");
 
-    const data = ffmpeg.FS("readFile", "res.mp4");
-    const url = URL.createObjectURL(new Blob([data.buffer], {type:"video/mp4"}));
-    dom.vPre.src = url; dom.dl.href = url; dom.dl.style.display = "block";
+    ui.processBtn.disabled = true;
+    ui.downloadBtn.style.display = "none";
+    ui.progCont.style.display = "block";
+    ui.progressBar.style.width = "0%";
     
-    dom.ov.style.display = 'none';
-    dom.sEdit.classList.add('hidden_node');
-    dom.sRes.classList.remove('hidden_node');
+    if (!isLoaded) {
+        ui.statusText.innerText = "Загрузка FFmpeg...";
+        await ffmpeg.load();
+        isLoaded = true;
+    }
+
+    let db, dur;
+    if (currentMode === 'auto') {
+        const auto = getAutoParams();
+        db = auto.db; dur = auto.dur;
+    } else {
+        db = parseFloat(ui.threshold.value);
+        dur = parseFloat(ui.duration.value);
+    }
+
+    const silences = detectSilenceFast(db, dur);
+    const segments = [];
+    let prev = 0;
+    const PAD = 0.1;
+    silences.forEach(s => {
+        if (s.start > prev) segments.push({ start: Math.max(0, prev - (prev===0?0:PAD)), end: s.start + PAD });
+        prev = s.end;
+    });
+    if (prev < audioDuration) segments.push({ start: Math.max(0, prev - PAD), end: audioDuration });
+
+    totalOutDur = segments.reduce((acc, s) => acc + (s.end - s.start), 0);
+    
+    ui.statusText.innerText = "Подготовка видео...";
+    ffmpeg.FS("writeFile", "in.mp4", await fetchFile(file));
+
+    let filter = "";
+    let concat = "";
+    segments.forEach((s, i) => {
+        filter += `[0:v]trim=start=${s.start.toFixed(3)}:end=${s.end.toFixed(3)},setpts=PTS-STARTPTS[v${i}];`;
+        filter += `[0:a]atrim=start=${s.start.toFixed(3)}:end=${s.end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}];`;
+        concat += `[v${i}][a${i}]`;
+    });
+    filter += `${concat}concat=n=${segments.length}:v=1:a=1[ov][oa]`;
+
+    ui.statusText.innerText = "Запуск рендеринга...";
+    startTime = Date.now(); // Фиксируем время начала
+
+    await ffmpeg.run(
+        "-i", "in.mp4",
+        "-filter_complex", filter,
+        "-map", "[ov]", "-map", "[oa]", 
+        "-c:v", "libx264", 
+        "-preset", "ultrafast", 
+        "-crf", "28", 
+        "-c:a", "aac", 
+        "out.mp4"
+    );
+
+    const data = ffmpeg.FS("readFile", "out.mp4");
+    const url = URL.createObjectURL(new Blob([data.buffer], { type: "video/mp4" }));
+    
+    ui.progressBar.style.width = "100%";
+    ui.preview.src = url;
+    ui.downloadBtn.href = url;
+    ui.downloadBtn.style.display = "block";
+    ui.statusText.innerText = "Готово!";
+    ui.etaText.innerText = "Обработка завершена";
+    ui.processBtn.disabled = false;
 };
 </script>
-
 </body>
 </html>
