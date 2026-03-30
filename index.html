@@ -2,82 +2,273 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pause Remover Pro</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pause Remover Pro — Умное удаление пауз</title>
   <style>
-    :root { --primary: #2b6cff; --success: #00b894; --bg: #f5f9ff; }
-    body { margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); display: flex; justify-content: center; color: #333; }
-    .app { width: 100%; max-width: 600px; padding: 20px; }
-    .card { background: white; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-    h2 { text-align: center; margin-top: 0; color: var(--primary); }
-    input[type="file"] { width: 100%; padding: 10px; border: 1px dashed #ccc; border-radius: 10px; cursor: pointer; box-sizing: border-box; }
-    label { font-size: 14px; margin-top: 15px; display: block; font-weight: bold; }
-    .slider-info { display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-top: 4px; }
-    input[type="range"] { width: 100%; margin-top: 8px; cursor: pointer; }
-    
-    /* Progress Bar Styles */
-    .progress-container { margin: 20px 0; display: none; }
-    .progress-bg { width: 100%; background: #eee; height: 12px; border-radius: 6px; overflow: hidden; }
-    #progressBar { width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease; }
-    #statusText { text-align: center; font-weight: bold; margin-bottom: 5px; font-size: 15px; }
-    #etaText { text-align: center; font-size: 12px; color: #888; margin-top: 5px; }
+    :root {
+      --primary: #2b6cff;
+      --accent: #00d2ff;
+      --success: #00b894;
+      --glass: rgba(255, 255, 255, 0.92);
+      --text: #1e293b;
+    }
 
-    button { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--primary); color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-    button:disabled { background: #ccc; cursor: not-allowed; }
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      /* Насыщенный синий анимированный фон */
+      background: linear-gradient(-45deg, #0f172a, #1e3a8a, #2563eb, #3b82f6);
+      background-size: 400% 400%;
+      animation: gradientBG 12s ease infinite;
+      color: var(--text);
+    }
+
+    @keyframes gradientBG {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* Шапка сайта */
+    header {
+      padding: 25px 20px;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      color: white;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    header h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+    header p { margin: 5px 0 0; opacity: 0.8; font-size: 14px; }
+
+    .main-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 20px;
+    }
+
+    .intro-text {
+      max-width: 600px;
+      text-align: center;
+      color: white;
+      margin-bottom: 30px;
+    }
+
+    .intro-text h2 { font-size: 22px; margin-bottom: 10px; }
+    .intro-text p { font-size: 15px; opacity: 0.9; line-height: 1.5; }
+
+    /* Основная карточка приложения */
+    .app-card {
+      background: var(--glass);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      padding: 30px;
+      width: 100%;
+      max-width: 500px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Расширенное состояние для ПК при загрузке видео */
+    @media (min-width: 900px) {
+      .app-card.video-loaded {
+        max-width: 1000px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+      }
+    }
+
+    /* Стили для блоков внутри */
+    .section-title { font-weight: 700; font-size: 18px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
     
-    #waveform { width: 100%; height: 120px; background: #fafafa; border-radius: 10px; border: 1px solid #eee; display: block; }
-    video { width: 100%; border-radius: 12px; margin-top: 10px; background: #000; }
-    #downloadBtn { display: none; margin-top: 12px; text-align: center; padding: 15px; background: var(--success); color: white; text-decoration: none; border-radius: 12px; font-weight: bold; }
+    /* Стили загрузки файла */
+    .upload-zone {
+      border: 2px dashed #cbd5e1;
+      border-radius: 16px;
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.3s;
+      background: rgba(255, 255, 255, 0.5);
+    }
+    .upload-zone:hover { border-color: var(--primary); background: #f0f7ff; }
+    .upload-zone span { font-size: 40px; display: block; margin-bottom: 10px; }
+
+    /* Вкладки */
+    .tabs { display: flex; background: #f1f5f9; border-radius: 12px; padding: 4px; margin: 20px 0; }
+    .tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; border-radius: 10px; font-weight: 600; font-size: 14px; transition: 0.2s; }
+    .tab.active { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(43, 108, 255, 0.2); }
+
+    /* Ползунки */
+    label { font-size: 13px; font-weight: 600; color: #64748b; margin-top: 15px; display: block; }
+    input[type="range"] { width: 100%; accent-color: var(--primary); margin: 8px 0; }
+    .slider-info { display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8; }
+
+    /* Прогресс-бар */
+    .progress-container { margin: 20px 0; background: #f1f5f9; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0; }
+    .progress-bg { width: 100%; background: #e2e8f0; height: 10px; border-radius: 5px; overflow: hidden; margin: 10px 0; }
+    #progressBar { width: 0%; height: 100%; background: var(--primary); transition: 0.3s; }
+    #statusText { text-align: center; font-weight: 700; font-size: 14px; }
+    #etaText { text-align: center; font-size: 12px; color: #64748b; }
+
+    /* Кнопки */
+    button { 
+      width: 100%; padding: 16px; border: none; border-radius: 14px; 
+      background: var(--primary); color: white; font-size: 16px; 
+      font-weight: 700; cursor: pointer; transition: 0.3s;
+      box-shadow: 0 4px 15px rgba(43, 108, 255, 0.3);
+    }
+    button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(43, 108, 255, 0.4); }
+    button:disabled { background: #cbd5e1; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    /* Видео и осциллограмма */
+    #waveform { width: 100%; height: 80px; background: rgba(0,0,0,0.03); border-radius: 12px; margin-top: 15px; }
+    .video-card { display: flex; flex-direction: column; gap: 15px; }
+    video { width: 100%; border-radius: 16px; background: #000; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    
+    #downloadBtn { 
+      display: none; padding: 16px; background: var(--success); color: white; 
+      text-decoration: none; border-radius: 14px; text-align: center; 
+      font-weight: 700; box-shadow: 0 4px 15px rgba(0, 184, 148, 0.3);
+    }
+
+    footer {
+      padding: 40px 20px;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 14px;
+    }
+    footer a { color: white; text-decoration: none; margin: 0 10px; opacity: 0.8; }
+    footer a:hover { opacity: 1; text-decoration: underline; }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 768px) {
+      .app-card { padding: 20px; }
+      .video-card video { width: 100%; }
+    }
   </style>
 </head>
 <body>
 
-<div class="app">
-  <div class="card">
-    <h2>Remove Pauses</h2>
-    <input type="file" id="fileInput" accept="video/*">
+<header>
+  <h1>Pause Remover Pro</h1>
+  <p>AI-Powered Video Editing</p>
+</header>
+
+<div class="main-container">
+  <div class="intro-text" id="introText">
+    <h2>Сделайте ваши видео динамичными</h2>
+    <p>Наша нейросеть автоматически находит и вырезает моменты тишины, оставляя только самое важное. Просто загрузите файл и получите готовый результат за считанные секунды.</p>
   </div>
 
- <div class="card">
-  <div style="display: flex; background: #eee; border-radius: 10px; padding: 4px; margin-bottom: 15px;">
-    <div id="tabAuto" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px; background: var(--primary); color: white; font-weight: bold;">Авто</div>
-    <div id="tabManual" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px;">Вручную</div>
+  <div class="app-card" id="appCard">
+    <div class="controls-card">
+      <div class="section-title"><span>⚙️</span> Настройка обработки</div>
+      
+      <div class="upload-zone" onclick="document.getElementById('fileInput').click()" id="uploadZone">
+        <span>📁</span>
+        <strong>Выберите видеофайл</strong>
+        <p style="font-size: 12px; color: #64748b; margin-top: 5px;">MP4, MOV или AVI</p>
+        <input type="file" id="fileInput" accept="video/*" class="hidden">
+      </div>
+
+      <div id="settingsContent" class="hidden">
+        <div class="tabs">
+          <div id="tabAuto" class="tab active">Автоматически</div>
+          <div id="tabManual" class="tab">Вручную</div>
+        </div>
+
+        <div id="manualControls" style="display: none;">
+          <label>Мин. длительность паузы</label>
+          <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
+          <div class="slider-info"><span id="durationVal">0.5 сек</span><span>2.0 сек</span></div>
+
+          <label>Порог чувствительности (dB)</label>
+          <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
+          <div class="slider-info"><span id="thresholdVal">-35 dB</span><span>Громко</span></div>
+        </div>
+
+        <div id="autoInfo" style="padding: 12px; font-size: 13px; background: #eef2ff; border-radius: 10px; border: 1px solid #e0e7ff; margin: 15px 0; color: #4338ca;">
+          ✨ <b>Режим «Авто»:</b> Система сама проанализирует шум и голос, чтобы найти идеальный баланс.
+        </div>
+
+        <canvas id="waveform"></canvas>
+
+        <div class="progress-container" id="progCont">
+          <div id="statusText">Подготовка...</div>
+          <div class="progress-bg"><div id="progressBar"></div></div>
+          <div id="etaText">Расчет времени...</div>
+        </div>
+
+        <button id="processBtn">Запустить обработку</button>
+      </div>
+    </div>
+
+    <div class="video-card hidden" id="videoSection">
+      <div class="section-title"><span>🎬</span> Предпросмотр</div>
+      <video id="preview" controls></video>
+      <a id="downloadBtn" download="cleaned_video.mp4">💾 Скачать готовое видео</a>
+    </div>
   </div>
-
-  <div id="manualControls" style="display: none;">
-    <label>Минимальная тишина</label>
-    <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
-    <div class="slider-info"><span>Короткие паузы</span><span id="durationVal">0.5 сек</span></div>
-
-    <label>Чувствительность (dB)</label>
-    <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
-    <div class="slider-info"><span>Тише</span><span id="thresholdVal">-35 dB</span></div>
-  </div>
-
-  <div id="autoInfo" style="padding: 10px; font-size: 14px; background: #f0f7ff; border-radius: 10px; border: 1px solid #d0e0ff; margin-bottom: 10px;">
-    ✨ Режим «Авто» подберет настройки под ваш звук.
-  </div>
-
-  <div class="progress-container" id="progCont">
-    <div id="statusText">Ожидание...</div>
-    <div class="progress-bg"><div id="progressBar"></div></div>
-    <div id="etaText">Осталось: -- сек</div>
-  </div>
-
-  <button id="processBtn">Запустить обработку</button>
 </div>
 
-  <div class="card">
-    <canvas id="waveform"></canvas>
+<footer>
+  <div style="margin-bottom: 15px;">
+    <strong>Pause Remover Pro</strong> — Профессиональный инструмент для блогеров и контент-мейкеров.
   </div>
+  <nav>
+    <a href="#">Политика конфиденциальности</a>
+    <a href="#">Условия использования</a>
+    <a href="#">Поддержка</a>
+  </nav>
+  <p style="margin-top: 20px; opacity: 0.5;">&copy; 2024 AI Video Tools Lab. Все права защищены.</p>
+</footer>
 
-  <div class="card">
-    <video id="preview" controls></video>
-    <a id="downloadBtn" download="no_pauses.mp4">Скачать готовое видео</a>
-  </div>
-</div>
+<script>
+  const fileInput = document.getElementById('fileInput');
+  const uploadZone = document.getElementById('uploadZone');
+  const settingsContent = document.getElementById('settingsContent');
+  const videoSection = document.getElementById('videoSection');
+  const appCard = document.getElementById('appCard');
+  const introText = document.getElementById('introText');
 
-<script src="./ffmpeg/ffmpeg.min.js"></script>
-<script src="script.js"></script>
+  fileInput.addEventListener('change', function() {
+    if (this.files && this.files[0]) {
+      // Прячем зону загрузки и текст, показываем настройки и видео
+      uploadZone.classList.add('hidden');
+      introText.classList.add('hidden');
+      settingsContent.classList.remove('hidden');
+      videoSection.classList.remove('hidden');
+      appCard.classList.add('video-loaded');
+    }
+  });
+
+  // Переключение табов (визуальное)
+  document.getElementById('tabAuto').addEventListener('click', function() {
+    this.classList.add('active');
+    document.getElementById('tabManual').classList.remove('active');
+    document.getElementById('manualControls').style.display = 'none';
+    document.getElementById('autoInfo').style.display = 'block';
+  });
+
+  document.getElementById('tabManual').addEventListener('click', function() {
+    this.classList.add('active');
+    document.getElementById('tabAuto').classList.remove('active');
+    document.getElementById('manualControls').style.display = 'block';
+    document.getElementById('autoInfo').style.display = 'none';
+  });
+</script>
+
 </body>
 </html>
