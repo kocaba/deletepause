@@ -1,92 +1,63 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pause Remover Pro</title>
   <style>
-    :root {
-      --primary: #2b6cff;
-      --success: #00b894;
-      --bg: #000;
-      --card-bg: rgba(255, 255, 255, 0.95);
+    :root { --primary: #2b6cff; --success: #00b894; --bg: #000; }
+    
+    body { 
+      margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); 
+      display: flex; justify-content: center; color: #333; min-height: 100vh;
+      overflow-x: hidden; position: relative;
     }
 
-    body {
-      margin: 0;
-      font-family: -apple-system, sans-serif;
-      background: var(--bg);
-      display: flex;
-      justify-content: center;
-      min-height: 100vh;
-      color: #333;
-      overflow-x: hidden;
-    }
-
-    /* Фонова анімація */
+    /* Анімований фон */
     .bg-circle {
-      position: fixed;
-      width: 500px; height: 500px;
+      position: fixed; width: 600px; height: 600px;
       background: radial-gradient(circle, #1e3a8a 0%, rgba(0,0,0,0) 70%);
-      border-radius: 50%; filter: blur(60px);
-      z-index: -1; animation: move 15s infinite alternate ease-in-out;
+      border-radius: 50%; filter: blur(80px); z-index: -1;
+      animation: move 12s infinite alternate ease-in-out;
     }
-    @keyframes move { from { transform: translate(-30%, -20%); } to { transform: translate(80%, 50%); } }
+    @keyframes move { from { transform: translate(-20%, 10%); } to { transform: translate(70%, 60%); } }
 
     .app { width: 100%; max-width: 600px; padding: 20px; z-index: 1; }
-
-    .card {
-      background: var(--card-bg);
-      border-radius: 20px;
-      padding: 25px;
-      margin-bottom: 16px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-    }
-
-    /* Оверлей прогресу на весь екран */
-    #processingOverlay {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.9);
-      z-index: 9999;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      color: white;
-      text-align: center;
-    }
-
-    #processingOverlay .progress-box { width: 80%; max-width: 400px; }
-
-    /* Стилі елементів */
-    .tabs-container { display: flex; background: #eee; border-radius: 10px; padding: 4px; margin-bottom: 15px; }
-    .tab-btn { flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px; font-weight: bold; }
-    .tab-active { background: var(--primary); color: white; }
-
-    #waveform { 
-      width: 100%; height: 100px; 
-      background: #eee; /* Світло-сірий фон для доріжки */
-      border-radius: 10px; margin-bottom: 15px; 
-    }
-
-    input[type="range"] { width: 100%; accent-color: var(--primary); cursor: pointer; }
     
-    .video-container { display: flex; justify-content: center; width: 100%; margin-bottom: 20px; }
-    video { width: 40%; border-radius: 12px; background: #000; }
-
-    button { 
-      width: 100%; padding: 15px; border: none; border-radius: 12px; 
-      background: var(--primary); color: white; font-size: 16px; font-weight: bold; cursor: pointer; 
+    .card { 
+      background: rgba(255, 255, 255, 0.95); border-radius: 20px; padding: 20px; 
+      margin-bottom: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
     }
 
-    #downloadBtn { 
-      display: block; text-align: center; padding: 15px; 
-      background: var(--success); color: white; text-decoration: none; 
-      border-radius: 12px; font-weight: bold; margin-bottom: 10px;
+    /* Опис програми */
+    .intro { text-align: center; color: white; margin-bottom: 20px; }
+    .intro h1 { margin: 0; font-size: 26px; }
+    .intro p { opacity: 0.7; font-size: 14px; margin-top: 8px; }
+
+    h2 { text-align: center; margin-top: 0; color: var(--primary); }
+    
+    /* Оверлей обробки */
+    #processingOverlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9); z-index: 1000; flex-direction: column;
+      justify-content: center; align-items: center; color: white;
     }
 
-    .hidden { display: none !important; }
+    /* Відео 40% ширини */
+    .video-wrap { display: flex; justify-content: center; width: 100%; }
+    video { width: 40% !important; border-radius: 12px; background: #000; }
+
+    input[type="file"] { width: 100%; padding: 20px; border: 2px dashed #ccc; border-radius: 12px; cursor: pointer; background: white; }
+    
+    /* Сховати блоки до завантаження */
+    #step-editor, #step-waveform, #step-result { display: none; }
+
+    button { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--primary); color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+    
+    #waveform { width: 100%; height: 120px; background: #eee; border-radius: 10px; display: block; }
+    
+    #downloadBtn { display: none; margin-top: 12px; text-align: center; padding: 15px; background: var(--success); color: white; text-decoration: none; border-radius: 12px; font-weight: bold; }
+    .btn-new { background: #666; }
   </style>
 </head>
 <body>
@@ -94,58 +65,64 @@
 <div class="bg-circle"></div>
 
 <div id="processingOverlay">
-  <div class="progress-box">
-    <h2 style="color: white;">Обробка відео...</h2>
-    <div id="statusText" style="font-size: 24px; margin-bottom: 10px;">0%</div>
-    <div style="width: 100%; background: #333; height: 12px; border-radius: 6px; overflow: hidden; margin-bottom: 10px;">
-      <div id="progressBar" style="width: 0%; height: 100%; background: var(--primary); transition: 0.3s;"></div>
+    <h2>Обработка видео...</h2>
+    <div id="overlayStatus" style="font-size: 30px; font-weight: bold; margin: 10px;">0%</div>
+    <div style="width: 80%; max-width: 400px; background: #333; height: 10px; border-radius: 5px; overflow: hidden;">
+        <div id="overlayBar" style="width: 0%; height: 100%; background: var(--primary); transition: 0.3s;"></div>
     </div>
-    <div id="etaText" style="opacity: 0.7;">Залишилось: -- сек</div>
-  </div>
+    <p id="overlayEta" style="margin-top: 15px; opacity: 0.8;">Осталось: -- сек</p>
 </div>
 
 <div class="app">
-  <div class="card" id="uploadStep">
-    <h2 style="text-align:center; color:var(--primary)">Pause Remover Pro</h2>
-    <div style="border: 2px dashed #ccc; padding: 40px; text-align:center; border-radius:15px; cursor:pointer" onclick="document.getElementById('fileInput').click()">
-      <span style="font-size:40px">📁</span>
-      <p>Оберіть відео для видалення пауз</p>
-    </div>
-    <input type="file" id="fileInput" accept="video/*" class="hidden">
+  <div class="intro" id="intro-header">
+    <h1>Pause Remover Pro</h1>
+    <p>Автоматичне видалення тиші з ваших відео за декілька секунд.</p>
   </div>
 
-  <div class="card hidden" id="settingsStep">
-    <div class="tabs-container">
-      <div id="tabAutoUI" class="tab-btn tab-active">Авто</div>
-      <div id="tabManualUI" class="tab-btn">Вручну</div>
-    </div>
+  <div class="card" id="step-upload">
+    <h2>Загрузить видео</h2>
+    <input type="file" id="fileInput" accept="video/*">
+  </div>
 
-    <div id="tabAuto" class="hidden"></div>
-    <div id="tabManual" class="hidden"></div>
+  <div class="card" id="step-editor">
+    <div style="display: flex; background: #eee; border-radius: 10px; padding: 4px; margin-bottom: 15px;">
+      <div id="tabAuto" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px; background: var(--primary); color: white; font-weight: bold;">Авто</div>
+      <div id="tabManual" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px;">Вручную</div>
+    </div>
 
     <div id="manualControls" style="display: none;">
-      <label style="font-size:13px; font-weight:bold">Мінімальна тиша</label>
+      <label>Минимальная тишина</label>
       <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
-      <label style="font-size:13px; font-weight:bold; margin-top:10px; display:block">Чутливість (dB)</label>
+      <div class="slider-info"><span>Короткие паузы</span><span id="durationVal">0.5 сек</span></div>
+      <label>Чувствительность (dB)</label>
       <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
+      <div class="slider-info"><span>Тише</span><span id="thresholdVal">-35 dB</span></div>
     </div>
 
-    <div id="autoInfo" style="padding: 10px; font-size: 14px; background: #f0f7ff; border-radius: 10px; margin: 10px 0; color: #1e40af;">
-      ✨ AI автоматично знайде найкращі налаштування.
+    <div id="autoInfo" style="padding: 10px; font-size: 14px; background: #f0f7ff; border-radius: 10px; border: 1px solid #d0e0ff; margin-bottom: 10px;">
+      ✨ Режим «Авто» подберет настройки под ваш звук.
     </div>
 
-    <canvas id="waveform"></canvas>
+    <div style="margin: 15px 0;">
+        <label>Анализ звука (серый):</label>
+        <canvas id="waveform"></canvas>
+    </div>
 
-    <button id="processBtn">ЗАПУСТИТИ ОБРОБКУ</button>
+    <div class="progress-container" id="progCont" style="display: none;">
+      <div id="statusText">Ожидание...</div>
+      <div id="progressBar"></div>
+      <div id="etaText"></div>
+    </div>
+
+    <button id="processBtn">Запустить обработку</button>
   </div>
 
-  <div class="card hidden" id="resultStep">
-    <h2 style="text-align:center; color:var(--success)">Готово!</h2>
-    <div class="video-container">
-      <video id="preview" controls></video>
+  <div class="card" id="step-result">
+    <div class="video-wrap">
+        <video id="preview" controls></video>
     </div>
-    <a id="downloadBtn" download="no_pauses.mp4">📥 СКАЧАТИ ВІДЕО</a>
-    <button style="background:#666" onclick="location.reload()">➕ НОВЕ ВІДЕО</button>
+    <a id="downloadBtn" download="no_pauses.mp4">Скачать готовое видео</a>
+    <button class="btn-new" onclick="location.reload()">Новое видео</button>
   </div>
 </div>
 
@@ -153,60 +130,62 @@
 <script src="script.js"></script>
 
 <script>
-  // Логіка перемикання екранів та дизайну
-  const fileInput = document.getElementById('fileInput');
-  const uploadStep = document.getElementById('uploadStep');
-  const settingsStep = document.getElementById('settingsStep');
-  const resultStep = document.getElementById('resultStep');
-  const processBtn = document.getElementById('processBtn');
-  const overlay = document.getElementById('processingOverlay');
+    // ЛОГІКА ДИЗАЙНУ (не зачіпає script.js)
+    const fileInput = document.getElementById('fileInput');
+    const processBtn = document.getElementById('processBtn');
+    const overlay = document.getElementById('processingOverlay');
+    const downloadBtn = document.getElementById('downloadBtn');
 
-  // 1. Після вибору файлу показуємо налаштування
-  fileInput.addEventListener('change', () => {
-    if (fileInput.files.length > 0) {
-      uploadStep.classList.add('hidden');
-      settingsStep.classList.remove('hidden');
-      
-      // Налаштування кольору Waveform на СІРИЙ у вашому script.js
-      // Якщо ви використовуєте Wavesurfer або Canvas, переконайтесь, що:
-      // waveColor: '#999999' (або подібний сірий)
-    }
-  });
+    // 1. Поява блоків після вибору файлу
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+            document.getElementById('step-upload').style.display = 'none';
+            document.getElementById('intro-header').style.display = 'none';
+            document.getElementById('step-editor').style.display = 'block';
+        }
+    });
 
-  // 2. При натисканні на "Запустити" показуємо оверлей
-  processBtn.addEventListener('click', () => {
-    overlay.style.display = 'flex';
-  });
+    // 2. Оверлей при натисканні кнопки
+    processBtn.addEventListener('click', () => {
+        overlay.style.display = 'flex';
+    });
 
-  // 3. Логіка завершення (спостерігаємо за появою кнопки скачати)
-  // У вашому script.js, коли обробка завершена, downloadBtn отримує display: block.
-  // Ми використаємо це, щоб змінити екрани.
-  const downloadBtn = document.getElementById('downloadBtn');
-  const observer = new MutationObserver(() => {
-    if (downloadBtn.style.display === 'block' || !downloadBtn.classList.contains('hidden')) {
-      overlay.style.display = 'none';
-      settingsStep.classList.add('hidden');
-      resultStep.classList.remove('hidden');
-    }
-  });
-  observer.observe(downloadBtn, { attributes: true, attributeFilter: ['style', 'class'] });
+    // 3. Синхронізація прогресу з оверлеєм
+    const realBar = document.getElementById('progressBar');
+    const realStatus = document.getElementById('statusText');
+    const realEta = document.getElementById('etaText');
 
-  // 4. Перемикання табів UI
-  const tAutoUI = document.getElementById('tabAutoUI');
-  const tManualUI = document.getElementById('tabManualUI');
-  const manControls = document.getElementById('manualControls');
-  const autoInf = document.getElementById('autoInfo');
+    const observer = new MutationObserver(() => {
+        document.getElementById('overlayBar').style.width = realBar.style.width;
+        document.getElementById('overlayStatus').innerText = realStatus.innerText;
+        document.getElementById('overlayEta').innerText = realEta.innerText;
 
-  tAutoUI.onclick = () => {
-    tAutoUI.classList.add('tab-active'); tManualUI.classList.remove('tab-active');
-    manControls.style.display = 'none'; autoInf.style.display = 'block';
-    document.getElementById('tabAuto').click();
-  };
-  tManualUI.onclick = () => {
-    tManualUI.classList.add('tab-active'); tAutoUI.classList.remove('tab-active');
-    manControls.style.display = 'block'; autoInf.style.display = 'none';
-    document.getElementById('tabManual').click();
-  };
+        // Коли з'являється кнопка "Скачать", ховаємо все і показуємо результат
+        if (window.getComputedStyle(downloadBtn).display === 'block') {
+            overlay.style.display = 'none';
+            document.getElementById('step-editor').style.display = 'none';
+            document.getElementById('step-result').style.display = 'block';
+        }
+    });
+
+    observer.observe(realBar, { attributes: true });
+    observer.observe(realStatus, { childList: true, characterData: true, subtree: true });
+
+    // 4. Перемикання табів (дизайн)
+    const tAuto = document.getElementById('tabAuto');
+    const tManual = document.getElementById('tabManual');
+    tAuto.onclick = () => {
+        tAuto.style.background = 'var(--primary)'; tAuto.style.color = 'white';
+        tManual.style.background = 'none'; tManual.style.color = '#333';
+        document.getElementById('manualControls').style.display = 'none';
+        document.getElementById('autoInfo').style.display = 'block';
+    };
+    tManual.onclick = () => {
+        tManual.style.background = 'var(--primary)'; tManual.style.color = 'white';
+        tAuto.style.background = 'none'; tAuto.style.color = '#333';
+        document.getElementById('manualControls').style.display = 'block';
+        document.getElementById('autoInfo').style.display = 'none';
+    };
 </script>
 
 </body>
