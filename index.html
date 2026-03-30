@@ -2,25 +2,30 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Pause Remover Pro</title>
   <style>
     :root {
-      --primary: #2b6cff;
-      --success: #00b894;
+      --primary: #0052ff;
+      --accent: #00d2ff;
+      --success: #00c853;
       --glass: rgba(255, 255, 255, 0.9);
     }
 
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
-      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      min-height: 100vh;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh;
+      height: 100svh; /* Для мобильных */
       display: flex;
       flex-direction: column;
-      /* Анимированный градиент на фоне */
-      background: linear-gradient(-45deg, #e3f2fd, #bbdefb, #e1f5fe, #e8eaf6);
-      background-size: 400% 400%;
-      animation: gradientBG 15s ease infinite;
+      /* Насыщенный синий градиент */
+      background: linear-gradient(-45deg, #00227b, #0052ff, #00d2ff, #74b9ff);
+      background-size: 300% 300%;
+      animation: gradientBG 8s ease infinite;
+      overflow: hidden; /* Запрет скролла на старте */
     }
 
     @keyframes gradientBG {
@@ -30,144 +35,121 @@
     }
 
     header {
-      padding: 20px;
+      padding: 15px;
       text-align: center;
-      background: rgba(255, 255, 255, 0.4);
+      background: rgba(255, 255, 255, 0.15);
       backdrop-filter: blur(10px);
-      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      color: white;
     }
 
-    header h1 {
-      margin: 0;
-      font-size: 24px;
-      color: var(--primary);
-      letter-spacing: 1px;
-    }
+    header h1 { margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 2px; }
 
     .main-container {
       flex: 1;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 15px;
+      overflow-y: auto; /* Скролл появится только если контент не влезет */
     }
 
     .app-card {
       background: var(--glass);
-      backdrop-filter: blur(15px);
-      border-radius: 24px;
-      padding: 30px;
+      backdrop-filter: blur(20px);
+      border-radius: 30px;
+      padding: 25px;
       width: 100%;
-      max-width: 900px;
-      box-shadow: 0 15px 35px rgba(0,0,0,0.1);
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 30px;
-      transition: all 0.5s ease;
+      max-width: 450px;
+      box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
     }
 
-    @media (max-width: 768px) {
-      .app-card { grid-template-columns: 1fr; padding: 20px; }
-      .video-section video { width: 60% !important; }
+    /* Когда файл загружен, расширяем для десктопа */
+    @media (min-width: 900px) {
+      .app-card.expanded {
+        max-width: 950px;
+        flex-direction: row;
+      }
+      .app-card.expanded .controls-section { flex: 1; }
+      .app-card.expanded .video-section { flex: 1; }
     }
 
-    /* Состояния интерфейса */
     .hidden { display: none !important; }
 
-    /* Левая колонка - Управление */
-    .controls-section { display: flex; flex-direction: column; gap: 20px; }
-
     .upload-box {
-      border: 2px dashed var(--primary);
-      border-radius: 15px;
-      padding: 40px 20px;
+      border: 3px dashed var(--primary);
+      border-radius: 20px;
+      padding: 50px 20px;
       text-align: center;
       cursor: pointer;
+      background: rgba(0, 82, 255, 0.05);
       transition: 0.3s;
-      background: rgba(43, 108, 255, 0.05);
     }
 
-    .upload-box:hover { background: rgba(43, 108, 255, 0.1); }
+    .upload-box:hover { background: rgba(0, 82, 255, 0.1); border-color: var(--accent); }
 
     .tabs { display: flex; background: #eee; border-radius: 12px; padding: 4px; }
-    .tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; border-radius: 10px; font-weight: 600; font-size: 14px; }
+    .tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; border-radius: 10px; font-weight: bold; font-size: 14px; }
     .tab.active { background: var(--primary); color: white; }
 
     button {
-      padding: 16px;
+      padding: 18px;
       border: none;
-      border-radius: 12px;
+      border-radius: 15px;
       font-weight: bold;
       cursor: pointer;
-      transition: 0.3s;
       font-size: 16px;
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 5px 15px rgba(0, 82, 255, 0.3);
     }
 
-    .btn-primary { background: var(--primary); color: white; }
-    .btn-success { background: var(--success); color: white; width: 100%; text-decoration: none; display: inline-block; text-align: center; }
-
-    /* Правая колонка - Видео */
     .video-section {
+      background: #000;
+      border-radius: 20px;
+      overflow: hidden;
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: #000;
-      border-radius: 15px;
-      overflow: hidden;
-      min-height: 200px;
     }
 
-    .video-section video { width: 100%; max-height: 400px; }
+    @media (max-width: 768px) {
+        body.file-loaded { overflow-y: auto; } /* Разрешаем скролл после загрузки */
+        .video-section video { width: 80% !important; margin: 10px auto; }
+    }
 
-    /* Overlay загрузки */
+    /* Overlay */
     #overlay {
       position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(5px);
-      display: none;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      color: white;
+      top:0; left:0; width:100%; height:100%;
+      background: rgba(0,10,30,0.9);
+      display:none; flex-direction:column; align-items:center; justify-content:center;
+      z-index:9999; color:white; backdrop-filter: blur(10px);
     }
 
-    .spinner {
-      width: 60px;
-      height: 60px;
-      border: 5px solid rgba(255,255,255,0.3);
-      border-top-color: var(--primary);
+    .loader {
+      width: 50px; height: 50px;
+      border: 5px solid rgba(255,255,255,0.1);
+      border-top: 5px solid var(--accent);
       border-radius: 50%;
       animation: spin 1s linear infinite;
-      margin-bottom: 20px;
     }
-
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .progress-track {
-      width: 250px;
-      height: 8px;
-      background: rgba(255,255,255,0.2);
-      border-radius: 4px;
-      overflow: hidden;
-      margin-top: 15px;
-    }
-
-    #overlayBar { width: 0%; height: 100%; background: var(--primary); transition: 0.3s; }
+    .progress-bar-wrap { width: 200px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; margin: 20px 0; overflow: hidden; }
+    #overlayBar { width: 0%; height: 100%; background: var(--accent); }
 
     footer {
-      padding: 20px;
+      padding: 15px;
       text-align: center;
-      background: rgba(255,255,255,0.4);
-      font-size: 13px;
-      color: #666;
+      background: rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.7);
+      font-size: 12px;
     }
-
-    footer a { color: var(--primary); text-decoration: none; margin: 0 10px; }
-
-    canvas { width: 100%; height: 80px; margin-top: 10px; border-radius: 8px; }
+    footer a { color: white; text-decoration: none; margin: 0 10px; }
   </style>
 </head>
 <body>
@@ -178,73 +160,48 @@
 
 <div class="main-container">
   <div class="app-card" id="appCard">
-    
-    <div class="controls-section" id="controlsSection">
-      
-      <div id="stepUpload" class="upload-box">
+    <div class="controls-section" id="controls">
+      <div id="stepUpload" class="upload-box" onclick="document.getElementById('fileInput').click()">
         <input type="file" id="fileInput" accept="video/*" style="display:none">
-        <div onclick="document.getElementById('fileInput').click()">
-          <span style="font-size: 40px;">📁</span>
-          <p>Нажмите, чтобы выбрать видео</p>
-        </div>
+        <div style="font-size: 40px; margin-bottom: 10px;">💙</div>
+        <strong>Нажмите сюда</strong>
+        <p style="font-size: 13px; opacity: 0.6;">чтобы загрузить видео</p>
       </div>
 
       <div id="stepSettings" class="hidden">
         <div class="tabs">
-          <div id="tabAuto" class="tab active">Автоматически</div>
-          <div id="tabManual" class="tab">Вручную</div>
+          <div id="tabAuto" class="tab active" onclick="setMode('auto')">Авто</div>
+          <div id="tabManual" class="tab" onclick="setMode('manual')">Вручную</div>
         </div>
-
-        <div id="manualPanel" class="hidden">
-          <label style="display:block; margin-top:15px; font-size:12px;">Тишина (сек): <b id="durV">0.5</b></label>
-          <input type="range" id="duration" min="0.1" max="2.0" step="0.1" value="0.5" style="width:100%">
-          
-          <label style="display:block; margin-top:10px; font-size:12px;">Порог (dB): <b id="thrV">-35</b></label>
-          <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35" style="width:100%">
+        <div id="manualPanel" class="hidden" style="margin-top:15px">
+            <input type="range" id="duration" min="0.1" max="2.0" step="0.1" value="0.5" style="width:100%">
+            <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35" style="width:100%">
         </div>
-
-        <p id="autoNote" style="font-size: 13px; color: #555; background: #e3f2fd; padding: 10px; border-radius: 8px; margin-top:15px;">
-          ✨ Режим "Авто" подберет лучшие настройки.
-        </p>
-        
-        <canvas id="waveform"></canvas>
-        
-        <button id="processBtn" class="btn-primary" style="width:100%; margin-top:20px;">Запустить обработку</button>
+        <canvas id="waveform" style="width:100%; height:60px; background:#f0f0f0; border-radius:10px; margin:10px 0;"></canvas>
+        <button id="processBtn" style="width:100%">ОБРАБОТАТЬ</button>
       </div>
 
-      <div id="stepDone" class="hidden">
-        <div style="text-align:center; padding: 20px;">
-          <span style="font-size: 50px;">✅</span>
-          <h3>Видео готово!</h3>
-          <a id="downloadBtn" class="btn-success" download="cleaned_video.mp4">Скачать файл</a>
-          <button onclick="location.reload()" style="background:none; color:var(--primary); margin-top:15px; border:1px solid">Начать заново</button>
-        </div>
+      <div id="stepDone" class="hidden" style="text-align:center">
+        <h2>Готово! ✨</h2>
+        <a id="downloadBtn" download="video.mp4" style="display:block; background:var(--success); color:white; padding:18px; border-radius:15px; text-decoration:none; font-weight:bold; margin-bottom:10px;">СКАЧАТЬ ВИДЕО</a>
+        <button onclick="location.reload()" style="background:none; color:var(--primary); border:1px solid">Новое видео</button>
       </div>
     </div>
 
-    <div class="video-section">
-      <video id="preview" controls></video>
-      <p id="videoHint" style="color:white; font-size:12px; padding:10px;">Предпросмотр появится здесь</p>
-    </div>
-
+    <div id="videoSection" class="video-section hidden"></div>
   </div>
 </div>
 
 <div id="overlay">
-  <div class="spinner"></div>
-  <h2 id="overlayStatus">Обработка...</h2>
-  <div id="overlayPercent">0%</div>
-  <div class="progress-track">
-    <div id="overlayBar"></div>
-  </div>
-  <p id="overlayETA" style="margin-top:10px; font-size:14px; color:#aaa;">Осталось: -- сек</p>
+  <div class="loader"></div>
+  <h3 id="status">Обработка...</h3>
+  <div class="progress-bar-wrap"><div id="overlayBar"></div></div>
+  <div id="percent">0%</div>
+  <div id="eta" style="font-size:12px; margin-top:10px; opacity:0.6">Осталось: --</div>
 </div>
 
 <footer>
-  <p>© 2024 Pause Remover Project</p>
-  <div>
-    <a href="#">О проекте</a> | <a href="#">Помощь</a> | <a href="#">Контакты</a>
-  </div>
+  <a href="#">Инструкция</a> | <a href="#">Помощь</a> | <a href="#">О проекте</a>
 </footer>
 
 <script src="./ffmpeg/ffmpeg.min.js"></script>
