@@ -1,67 +1,30 @@
-// =========================
-// INIT FFMPEG
-// =========================
-const { createFFmpeg, fetchFile } = FFmpeg;
-
-const ffmpeg = createFFmpeg({ log: true });
-
-let loaded = false;
-let logs = [];
-
-// =========================
-// STATE (новое)
-// =========================
+// глобально храним аудио данные
 let audioData = null;
 let audioDuration = 0;
-let sampleRate = 44100;
 
 // =========================
-// STATUS
-// =========================
-function setStatus(text) {
-  document.getElementById("progress").innerText = text;
-}
-
-// =========================
-// LOGGER
-// =========================
-ffmpeg.setLogger(({ message }) => {
-  logs.push(message);
-});
-
-// =========================
-// LOAD FFMPEG
-// =========================
-async function loadFFmpeg() {
-  if (!loaded) {
-    setStatus("Загрузка движка...");
-    await ffmpeg.load();
-    loaded = true;
-  }
-}
-
-// =========================
-// LOAD AUDIO (ВАЖНО)
+// ЗАГРУЗКА И ДЕКОД АУДИО
 // =========================
 async function loadAudioData(file) {
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   await audioCtx.resume();
 
-  const buffer = await file.arrayBuffer();
-  const decoded = await audioCtx.decodeAudioData(buffer);
+  const arrayBuffer = await file.arrayBuffer();
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
-  audioData = decoded.getChannelData(0);
-  audioDuration = decoded.duration;
-  sampleRate = decoded.sampleRate;
+  audioData = audioBuffer.getChannelData(0); // моно
+  audioDuration = audioBuffer.duration;
 }
 
 // =========================
-// DETECT SILENCE (БЫСТРО)
+// ПОИСК ТИШИНЫ (БЕЗ FFMPEG)
 // =========================
 function detectSilencePCM(thresholdDb, minDuration) {
-  const threshold = Math.pow(10, thresholdDb / 20);
+  const threshold = Math.pow(10, thresholdDb / 20); // dB → amplitude
 
+  const sampleRate = 44100; // приблизительно
   const windowSize = 1024;
+
   const silences = [];
 
   let silenceStart = null;
@@ -75,16 +38,20 @@ function detectSilencePCM(thresholdDb, minDuration) {
     }
 
     const rms = Math.sqrt(sum / windowSize);
+
     const time = i / sampleRate;
 
     if (rms < threshold) {
       if (silenceStart === null) silenceStart = time;
     } else {
       if (silenceStart !== null) {
-        const dur = time - silenceStart;
+        const duration = time - silenceStart;
 
-        if (dur >= minDuration) {
-          silences.push({ start: silenceStart, end: time });
+        if (duration >= minDuration) {
+          silences.push({
+            start: silenceStart,
+            end: time
+          });
         }
 
         silenceStart = null;
@@ -96,13 +63,13 @@ function detectSilencePCM(thresholdDb, minDuration) {
 }
 
 // =========================
-// DRAW WAVEFORM + SILENCE
+// РИСОВКА
 // =========================
-function drawWaveform() {
+function drawWaveformWithSilence(threshold, minDuration) {
   const canvas = document.getElementById("waveform");
   const ctx = canvas.getContext("2d");
 
-  // адаптив
+  // делаем canvas адаптивным
   canvas.width = canvas.offsetWidth;
   canvas.height = canvas.offsetHeight;
 
@@ -114,7 +81,9 @@ function drawWaveform() {
 
   ctx.clearRect(0, 0, width, height);
 
-  // waveform
+  // =========================
+  // РИСУЕМ WAVEFORM
+  // =========================
   ctx.fillStyle = "#888";
 
   for (let i = 0; i < width; i++) {
@@ -122,9 +91,9 @@ function drawWaveform() {
     let max = -1;
 
     for (let j = 0; j < step; j++) {
-      const val = audioData[(i * step) + j] || 0;
-      if (val < min) min = val;
-      if (val > max) max = val;
+      const datum = audioData[(i * step) + j] || 0;
+      if (datum < min) min = datum;
+      if (datum > max) max = datum;
     }
 
     ctx.fillRect(
@@ -135,13 +104,14 @@ function drawWaveform() {
     );
   }
 
-  // берём параметры
-  const threshold = parseFloat(document.getElementById("threshold").value);
-  const duration = parseFloat(document.getElementById("duration").value);
+  // =========================
+  // НАХОДИМ ТИШИНУ
+  // =========================
+  const silences = detectSilencePCM(threshold, minDuration);
 
-  const silences = detectSilencePCM(threshold, duration);
-
-  // красная подсветка
+  // =========================
+  // РИСУЕМ КРАСНЫЕ ЗОНЫ
+  // =========================
   ctx.fillStyle = "rgba(255,0,0,0.3)";
 
   silences.forEach(s => {
@@ -153,7 +123,7 @@ function drawWaveform() {
 }
 
 // =========================
-// FILE LOAD
+// ПРИ ЗАГРУЗКЕ ФАЙЛА
 // =========================
 document.getElementById("fileInput").onchange = async (e) => {
   const file = e.target.files[0];
@@ -165,181 +135,30 @@ document.getElementById("fileInput").onchange = async (e) => {
   setStatus("Анализ аудио...");
 
   await loadAudioData(file);
-  drawWaveform();
 
-  setStatus("Готово к обработке");
-};
-
-// =========================
-// LIVE UPDATE
-// =========================
-document.getElementById("threshold").oninput = () => {
-  if (audioData) drawWaveform();
-};
-
-document.getElementById("duration").oninput = () => {
-  if (audioData) drawWaveform();
-};
-
-// =========================
-// RESIZE
-// =========================
-window.addEventListener("resize", () => {
-  if (audioData) drawWaveform();
-});
-
-// =========================
-// PARSE SILENCE (FFMPEG)
-// =========================
-function parseSilence(logs) {
-  const silences = [];
-  let current = null;
-
-  logs.forEach(line => {
-    const start = line.match(/silence_start: (\d+\.?\d*)/);
-    const end = line.match(/silence_end: (\d+\.?\d*)/);
-
-    if (start) current = { start: parseFloat(start[1]) };
-
-    if (end && current) {
-      current.end = parseFloat(end[1]);
-      silences.push(current);
-      current = null;
-    }
-  });
-
-  return silences;
-}
-
-// =========================
-// GET DURATION
-// =========================
-function getDuration(logs) {
-  for (const line of logs) {
-    const m = line.match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
-    if (m) {
-      return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]);
-    }
-  }
-  return 0;
-}
-
-// =========================
-// BUILD SEGMENTS
-// =========================
-function buildSegments(silences, duration) {
-  const segments = [];
-  let prev = 0;
-
-  silences.forEach(s => {
-    if (s.start > prev) {
-      segments.push({ start: prev, end: s.start });
-    }
-    prev = s.end;
-  });
-
-  if (prev < duration) {
-    segments.push({ start: prev, end: duration });
-  }
-
-  return segments;
-}
-
-// =========================
-// MAIN PROCESS
-// =========================
-document.getElementById("processBtn").onclick = async () => {
-  const file = document.getElementById("fileInput").files[0];
-  if (!file) return alert("Выбери файл");
-
-  await loadFFmpeg();
-
-  logs = [];
-
-  setStatus("Загрузка файла...");
-  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
-
-  const duration = document.getElementById("duration").value;
-  const threshold = document.getElementById("threshold").value;
-
-  setStatus("Поиск тишины...");
-
-  await ffmpeg.run(
-    "-i", "input.mp4",
-    "-af", `silencedetect=noise=${threshold}dB:d=${duration}`,
-    "-f", "null",
-    "-"
-  );
-
-  const silences = parseSilence(logs);
-
-  if (!silences.length) {
-    setStatus("Тишина не найдена");
-    return;
-  }
-
-  const totalDuration = getDuration(logs);
-
-  let segments = buildSegments(silences, totalDuration);
-
-  const PAD = 0.08;
-
-  segments = segments.map(s => ({
-    start: Math.max(0, s.start - PAD),
-    end: s.end + PAD
-  }));
-
-  setStatus(`Найдено сегментов: ${segments.length}`);
-
-  for (let i = 0; i < segments.length; i++) {
-    const s = segments[i];
-
-    setStatus(`Сегмент ${i + 1} / ${segments.length}`);
-
-    await ffmpeg.run(
-      "-ss", String(s.start),
-      "-to", String(s.end),
-      "-i", "input.mp4",
-      "-c:v", "libx264",
-      "-c:a", "aac",
-      `part${i}.mp4`
-    );
-  }
-
-  setStatus("Склейка...");
-
-  let concatList = "";
-
-  for (let i = 0; i < segments.length; i++) {
-    concatList += `file part${i}.mp4\n`;
-  }
-
-  ffmpeg.FS(
-    "writeFile",
-    "list.txt",
-    new TextEncoder().encode(concatList)
-  );
-
-  await ffmpeg.run(
-    "-f", "concat",
-    "-safe", "0",
-    "-i", "list.txt",
-    "-c:v", "libx264",
-    "-c:a", "aac",
-    "output.mp4"
-  );
+  // первый рендер
+  updateWaveform();
 
   setStatus("Готово");
-
-  const data = ffmpeg.FS("readFile", "output.mp4");
-
-  const url = URL.createObjectURL(
-    new Blob([data.buffer], { type: "video/mp4" })
-  );
-
-  document.getElementById("preview").src = url;
-
-  const btn = document.getElementById("downloadBtn");
-  btn.href = url;
-  btn.style.display = "inline";
 };
+
+// =========================
+// ОБНОВЛЕНИЕ ПРИ ИЗМЕНЕНИИ
+// =========================
+function updateWaveform() {
+  const threshold = parseFloat(document.getElementById("threshold").value);
+  const duration = parseFloat(document.getElementById("duration").value);
+
+  drawWaveformWithSilence(threshold, duration);
+}
+
+// слушаем изменения
+document.getElementById("threshold").oninput = updateWaveform;
+document.getElementById("duration").oninput = updateWaveform;
+
+// =========================
+// РЕСАЙЗ (АДАПТИВ)
+// =========================
+window.addEventListener("resize", () => {
+  if (audioData) updateWaveform();
+});
