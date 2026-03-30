@@ -7,80 +7,52 @@
 
 <style>
 :root {
-  --primary: #4f7cff;
-  --accent: #00c9a7;
+  --primary: #2b6cff;
   --bg: #0b0f1a;
-  --card: rgba(255,255,255,0.05);
-  --border: rgba(255,255,255,0.08);
 }
 
-/* BACKGROUND */
+/* BODY */
 body {
   margin: 0;
   font-family: -apple-system, sans-serif;
   background: var(--bg);
   color: #fff;
-  overflow-x: hidden;
 }
 
-body::before {
-  content: "";
-  position: fixed;
-  width: 600px;
-  height: 600px;
-  background: radial-gradient(circle, #4f7cff55, transparent 70%);
-  filter: blur(120px);
-  animation: moveBg 12s infinite alternate ease-in-out;
-  z-index: -1;
-}
-
-@keyframes moveBg {
-  from { transform: translate(-20%, -10%); }
-  to { transform: translate(60%, 40%); }
-}
-
-/* LAYOUT */
+/* APP */
 .app {
   max-width: 700px;
   margin: auto;
   padding: 20px;
 }
 
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 25px;
-}
-
-.logo {
-  font-weight: bold;
-  font-size: 20px;
-  color: var(--primary);
-}
-
-.description {
-  text-align: center;
-  margin-bottom: 20px;
-  color: #aaa;
-}
-
 /* CARD */
 .card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  backdrop-filter: blur(12px);
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 15px;
 }
 
-/* INPUT */
+/* HIDDEN */
+.hidden {
+  display: none;
+}
+
+/* HEADER */
+.logo {
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: var(--primary);
+}
+
+/* FILE */
 input[type="file"] {
   width: 100%;
   padding: 15px;
-  border: 1px dashed #444;
   border-radius: 12px;
+  border: 1px dashed #444;
   background: transparent;
   color: #aaa;
 }
@@ -102,13 +74,14 @@ input[type="file"] {
   border-radius: 8px;
 }
 
-.active {
+.tab.active {
   background: var(--primary);
+  color: #fff;
 }
 
-/* SLIDERS */
+/* SLIDER */
 label {
-  margin-top: 12px;
+  margin-top: 10px;
   display: block;
 }
 
@@ -120,7 +93,7 @@ input[type="range"] {
   display: flex;
   justify-content: space-between;
   font-size: 12px;
-  color: #888;
+  color: #aaa;
 }
 
 /* BUTTON */
@@ -135,9 +108,23 @@ button {
   cursor: pointer;
 }
 
-/* VIDEO */
-video {
+/* WAVEFORM */
+#waveform {
   width: 100%;
+  height: 120px;
+  background: #111;
+  border-radius: 10px;
+}
+
+/* VIDEO */
+.video-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+video {
+  width: 40%;
+  min-width: 220px;
   border-radius: 12px;
   background: #000;
 }
@@ -146,43 +133,18 @@ video {
 #downloadBtn {
   display: none;
   margin-top: 10px;
-  padding: 14px;
-  background: var(--accent);
+  padding: 12px;
+  background: #00b894;
   text-align: center;
-  border-radius: 12px;
-  text-decoration: none;
+  border-radius: 10px;
   color: white;
+  text-decoration: none;
 }
 
-/* PROGRESS OVERLAY */
-#overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.85);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  z-index: 999;
-}
-
-.loader {
-  width: 60px;
-  height: 60px;
-  border: 4px solid #333;
-  border-top: 4px solid var(--primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 20px;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
+/* PROGRESS */
 .progress-container {
-  width: 80%;
-  max-width: 400px;
+  margin-top: 15px;
+  display: none;
 }
 
 .progress-bg {
@@ -197,90 +159,63 @@ video {
   width: 0%;
   background: var(--primary);
 }
-
-/* FOOTER */
-footer {
-  margin-top: 30px;
-  text-align: center;
-  color: #555;
-  font-size: 13px;
-}
-
-footer a {
-  color: #555;
-  margin: 0 10px;
-  text-decoration: none;
-}
 </style>
 </head>
 
 <body>
 
-<div id="overlay">
-  <div class="loader"></div>
-
-  <div class="progress-container" id="progCont">
-    <div id="statusText">Обработка...</div>
-    <div class="progress-bg"><div id="progressBar"></div></div>
-    <div id="etaText">Осталось: -- сек</div>
-  </div>
-</div>
-
 <div class="app">
 
-<header>
-  <div class="logo">Remove pauses</div>
-</header>
+<div class="logo">Remove pauses</div>
 
-<div class="description">
-  Автоматически удаляет паузы из видео и ускоряет монтаж
-</div>
-
-<div class="card">
+<!-- UPLOAD -->
+<div class="card" id="uploadCard">
   <input type="file" id="fileInput" accept="video/*">
 </div>
 
-<div class="card">
+<!-- SETTINGS -->
+<div class="card hidden" id="settingsCard">
 
   <div class="tabs">
     <div id="tabAuto" class="tab active">Авто</div>
-    <div id="tabManual" class="tab">Ручной режим</div>
+    <div id="tabManual" class="tab">Ручной</div>
   </div>
 
   <div id="manualControls" style="display:none;">
     <label>Минимальная тишина</label>
     <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
-    <div class="slider-info"><span></span><span id="durationVal">0.5</span></div>
+    <div class="slider-info"><span></span><span id="durationVal">0.5 сек</span></div>
 
     <label>Чувствительность</label>
     <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
-    <div class="slider-info"><span></span><span id="thresholdVal">-35</span></div>
+    <div class="slider-info"><span></span><span id="thresholdVal">-35 dB</span></div>
   </div>
 
-  <div id="autoInfo">
-    Режим авто сам подбирает настройки
+  <div id="autoInfo">Авто режим подбирает параметры</div>
+
+  <div class="progress-container" id="progCont">
+    <div id="statusText">Ожидание...</div>
+    <div class="progress-bg"><div id="progressBar"></div></div>
+    <div id="etaText">--</div>
   </div>
 
-  <button id="processBtn">Обработать видео</button>
+  <button id="processBtn">Обработать</button>
 </div>
 
-<div class="card">
+<!-- WAVEFORM -->
+<div class="card hidden" id="waveCard">
   <canvas id="waveform"></canvas>
 </div>
 
-<div class="card">
-  <video id="preview" controls></video>
+<!-- VIDEO -->
+<div class="card hidden" id="videoCard">
+  <div class="video-wrap">
+    <video id="preview" controls></video>
+  </div>
 
   <a id="downloadBtn" download="no_pauses.mp4">Скачать</a>
-
   <button onclick="location.reload()">Новое видео</button>
 </div>
-
-<footer>
-  <a href="#">Privacy</a>
-  <a href="#">Terms</a>
-  <a href="#">Contacts</a>
-</footer>
 
 </div>
 
@@ -288,15 +223,21 @@ footer a {
 <script src="script.js"></script>
 
 <script>
-/* UI only - не ломает логику */
-const overlay = document.getElementById("overlay");
-const processBtn = document.getElementById("processBtn");
+/* ================= UI ЛОГИКА (НЕ ЛОМАЕТ SCRIPT.JS) ================= */
 
-processBtn.addEventListener("click", () => {
-  overlay.style.display = "flex";
+const fileInput = document.getElementById("fileInput");
+const settingsCard = document.getElementById("settingsCard");
+const waveCard = document.getElementById("waveCard");
+const videoCard = document.getElementById("videoCard");
+
+/* Показ блоков після загрузки */
+fileInput.addEventListener("change", () => {
+  settingsCard.classList.remove("hidden");
+  waveCard.classList.remove("hidden");
+  videoCard.classList.remove("hidden");
 });
 
-/* вкладки */
+/* вкладки (той же id що у тебе) */
 const tabAuto = document.getElementById("tabAuto");
 const tabManual = document.getElementById("tabManual");
 const manualControls = document.getElementById("manualControls");
