@@ -5,77 +5,247 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pause Remover Pro</title>
   <style>
-    :root { --primary: #2b6cff; --success: #00b894; --bg: #f5f9ff; }
-    body { margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); display: flex; justify-content: center; color: #333; }
-    .app { width: 100%; max-width: 600px; padding: 20px; }
-    .card { background: white; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-    h2 { text-align: center; margin-top: 0; color: var(--primary); }
-    input[type="file"] { width: 100%; padding: 10px; border: 1px dashed #ccc; border-radius: 10px; cursor: pointer; box-sizing: border-box; }
-    label { font-size: 14px; margin-top: 15px; display: block; font-weight: bold; }
-    .slider-info { display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-top: 4px; }
-    input[type="range"] { width: 100%; margin-top: 8px; cursor: pointer; }
-    
-    /* Progress Bar Styles */
-    .progress-container { margin: 20px 0; display: none; }
-    .progress-bg { width: 100%; background: #eee; height: 12px; border-radius: 6px; overflow: hidden; }
-    #progressBar { width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease; }
-    #statusText { text-align: center; font-weight: bold; margin-bottom: 5px; font-size: 15px; }
-    #etaText { text-align: center; font-size: 12px; color: #888; margin-top: 5px; }
+    :root {
+      --primary: #2b6cff;
+      --success: #00b894;
+      --glass: rgba(255, 255, 255, 0.9);
+    }
 
-    button { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--primary); color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-    button:disabled { background: #ccc; cursor: not-allowed; }
-    
-    #waveform { width: 100%; height: 120px; background: #fafafa; border-radius: 10px; border: 1px solid #eee; display: block; }
-    video { width: 100%; border-radius: 12px; margin-top: 10px; background: #000; }
-    #downloadBtn { display: none; margin-top: 12px; text-align: center; padding: 15px; background: var(--success); color: white; text-decoration: none; border-radius: 12px; font-weight: bold; }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      /* Анимированный градиент на фоне */
+      background: linear-gradient(-45deg, #e3f2fd, #bbdefb, #e1f5fe, #e8eaf6);
+      background-size: 400% 400%;
+      animation: gradientBG 15s ease infinite;
+    }
+
+    @keyframes gradientBG {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    header {
+      padding: 20px;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.4);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 24px;
+      color: var(--primary);
+      letter-spacing: 1px;
+    }
+
+    .main-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .app-card {
+      background: var(--glass);
+      backdrop-filter: blur(15px);
+      border-radius: 24px;
+      padding: 30px;
+      width: 100%;
+      max-width: 900px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      transition: all 0.5s ease;
+    }
+
+    @media (max-width: 768px) {
+      .app-card { grid-template-columns: 1fr; padding: 20px; }
+      .video-section video { width: 60% !important; }
+    }
+
+    /* Состояния интерфейса */
+    .hidden { display: none !important; }
+
+    /* Левая колонка - Управление */
+    .controls-section { display: flex; flex-direction: column; gap: 20px; }
+
+    .upload-box {
+      border: 2px dashed var(--primary);
+      border-radius: 15px;
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.3s;
+      background: rgba(43, 108, 255, 0.05);
+    }
+
+    .upload-box:hover { background: rgba(43, 108, 255, 0.1); }
+
+    .tabs { display: flex; background: #eee; border-radius: 12px; padding: 4px; }
+    .tab { flex: 1; text-align: center; padding: 10px; cursor: pointer; border-radius: 10px; font-weight: 600; font-size: 14px; }
+    .tab.active { background: var(--primary); color: white; }
+
+    button {
+      padding: 16px;
+      border: none;
+      border-radius: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s;
+      font-size: 16px;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-success { background: var(--success); color: white; width: 100%; text-decoration: none; display: inline-block; text-align: center; }
+
+    /* Правая колонка - Видео */
+    .video-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+      border-radius: 15px;
+      overflow: hidden;
+      min-height: 200px;
+    }
+
+    .video-section video { width: 100%; max-height: 400px; }
+
+    /* Overlay загрузки */
+    #overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(5px);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      color: white;
+    }
+
+    .spinner {
+      width: 60px;
+      height: 60px;
+      border: 5px solid rgba(255,255,255,0.3);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .progress-track {
+      width: 250px;
+      height: 8px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 15px;
+    }
+
+    #overlayBar { width: 0%; height: 100%; background: var(--primary); transition: 0.3s; }
+
+    footer {
+      padding: 20px;
+      text-align: center;
+      background: rgba(255,255,255,0.4);
+      font-size: 13px;
+      color: #666;
+    }
+
+    footer a { color: var(--primary); text-decoration: none; margin: 0 10px; }
+
+    canvas { width: 100%; height: 80px; margin-top: 10px; border-radius: 8px; }
   </style>
 </head>
 <body>
 
-<div class="app">
-  <div class="card">
-    <h2>Remove Pauses</h2>
-    <input type="file" id="fileInput" accept="video/*">
+<header>
+  <h1>Pause Remover</h1>
+</header>
+
+<div class="main-container">
+  <div class="app-card" id="appCard">
+    
+    <div class="controls-section" id="controlsSection">
+      
+      <div id="stepUpload" class="upload-box">
+        <input type="file" id="fileInput" accept="video/*" style="display:none">
+        <div onclick="document.getElementById('fileInput').click()">
+          <span style="font-size: 40px;">📁</span>
+          <p>Нажмите, чтобы выбрать видео</p>
+        </div>
+      </div>
+
+      <div id="stepSettings" class="hidden">
+        <div class="tabs">
+          <div id="tabAuto" class="tab active">Автоматически</div>
+          <div id="tabManual" class="tab">Вручную</div>
+        </div>
+
+        <div id="manualPanel" class="hidden">
+          <label style="display:block; margin-top:15px; font-size:12px;">Тишина (сек): <b id="durV">0.5</b></label>
+          <input type="range" id="duration" min="0.1" max="2.0" step="0.1" value="0.5" style="width:100%">
+          
+          <label style="display:block; margin-top:10px; font-size:12px;">Порог (dB): <b id="thrV">-35</b></label>
+          <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35" style="width:100%">
+        </div>
+
+        <p id="autoNote" style="font-size: 13px; color: #555; background: #e3f2fd; padding: 10px; border-radius: 8px; margin-top:15px;">
+          ✨ Режим "Авто" подберет лучшие настройки.
+        </p>
+        
+        <canvas id="waveform"></canvas>
+        
+        <button id="processBtn" class="btn-primary" style="width:100%; margin-top:20px;">Запустить обработку</button>
+      </div>
+
+      <div id="stepDone" class="hidden">
+        <div style="text-align:center; padding: 20px;">
+          <span style="font-size: 50px;">✅</span>
+          <h3>Видео готово!</h3>
+          <a id="downloadBtn" class="btn-success" download="cleaned_video.mp4">Скачать файл</a>
+          <button onclick="location.reload()" style="background:none; color:var(--primary); margin-top:15px; border:1px solid">Начать заново</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="video-section">
+      <video id="preview" controls></video>
+      <p id="videoHint" style="color:white; font-size:12px; padding:10px;">Предпросмотр появится здесь</p>
+    </div>
+
   </div>
-
-  <div class="card">
-  <div style="display: flex; background: #eee; border-radius: 10px; padding: 4px; margin-bottom: 15px;">
-    <div id="tabAuto" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px; background: var(--primary); color: white; font-weight: bold;">Авто</div>
-    <div id="tabManual" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px;">Manual</div>
-  </div>
-
-  <div id="manualControls" style="display: none;">
-    <label>Минимальная тишина</label>
-    <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
-    <div class="slider-info"><span>Короткие паузы</span><span id="durationVal">0.5 сек</span></div>
-
-    <label>Чувствительность (dB)</label>
-    <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
-    <div class="slider-info"><span>Тише</span><span id="thresholdVal">-35 dB</span></div>
-  </div>
-
-  <div id="autoInfo" style="padding: 10px; font-size: 14px; background: #f0f7ff; border-radius: 10px; border: 1px solid #d0e0ff; margin-bottom: 10px;">
-    ✨ Auto
-  </div>
-
-  <div class="progress-container" id="progCont">
-    <div id="statusText">Ожидание...</div>
-    <div class="progress-bg"><div id="progressBar"></div></div>
-    <div id="etaText">Осталось: -- сек</div>
-  </div>
-
-  <button id="processBtn">Запустить обработку</button>
 </div>
 
-  <div class="card">
-    <canvas id="waveform"></canvas>
+<div id="overlay">
+  <div class="spinner"></div>
+  <h2 id="overlayStatus">Обработка...</h2>
+  <div id="overlayPercent">0%</div>
+  <div class="progress-track">
+    <div id="overlayBar"></div>
   </div>
-
-  <div class="card">
-    <video id="preview" controls></video>
-    <a id="downloadBtn" download="no_pauses.mp4">Скачать готовое видео</a>
-  </div>
+  <p id="overlayETA" style="margin-top:10px; font-size:14px; color:#aaa;">Осталось: -- сек</p>
 </div>
+
+<footer>
+  <p>© 2024 Pause Remover Project</p>
+  <div>
+    <a href="#">О проекте</a> | <a href="#">Помощь</a> | <a href="#">Контакты</a>
+  </div>
+</footer>
 
 <script src="./ffmpeg/ffmpeg.min.js"></script>
 <script src="script.js"></script>
