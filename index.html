@@ -7,6 +7,8 @@
   <style>
     :root { --primary: #2b6cff; --success: #00b894; --bg: #000; }
     
+    * { box-sizing: border-box; }
+
     body { 
       margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); 
       display: flex; justify-content: center; color: #333; min-height: 100vh;
@@ -26,38 +28,55 @@
     
     .card { 
       background: rgba(255, 255, 255, 0.95); border-radius: 20px; padding: 20px; 
-      margin-bottom: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); 
+      margin-bottom: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      width: 100%; overflow: hidden; /* Щоб нічого не вилазило */
     }
 
-    /* Опис програми */
-    .intro { text-align: center; color: white; margin-bottom: 20px; }
-    .intro h1 { margin: 0; font-size: 26px; }
-    .intro p { opacity: 0.7; font-size: 14px; margin-top: 8px; }
+    .intro-header { text-align: center; color: white; margin-bottom: 20px; }
 
-    h2 { text-align: center; margin-top: 0; color: var(--primary); }
-    
     /* Оверлей обробки */
     #processingOverlay {
       display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.9); z-index: 1000; flex-direction: column;
+      background: rgba(0,0,0,0.92); z-index: 1000; flex-direction: column;
       justify-content: center; align-items: center; color: white;
     }
 
-    /* Відео 40% ширини */
-    .video-wrap { display: flex; justify-content: center; width: 100%; }
+    /* Стилізація Input File */
+    .file-input-container {
+      width: 100%;
+      padding: 20px;
+      border: 2px dashed #ccc;
+      border-radius: 12px;
+      text-align: center;
+      background: #fff;
+    }
+    #fileInput { width: 100%; max-width: 100%; }
+
+    /* Аудіодоріжка (Waveform) - робимо СІРОЮ */
+    #waveform { 
+      width: 100%; height: 120px; background: #fafafa; border-radius: 10px; 
+      border: 1px solid #eee; display: block;
+      filter: grayscale(1) contrast(1.2); /* Змушує графік бути сірим */
+    }
+    
+    /* Відео 40% */
+    .video-wrap { display: flex; justify-content: center; width: 100%; margin: 10px 0; }
     video { width: 40% !important; border-radius: 12px; background: #000; }
 
-    input[type="file"] { width: 100%; padding: 20px; border: 2px dashed #ccc; border-radius: 12px; cursor: pointer; background: white; }
-    
-    /* Сховати блоки до завантаження */
-    #step-editor, #step-waveform, #step-result { display: none; }
+    /* Таби */
+    .tabs { display: flex; background: #eee; border-radius: 10px; padding: 4px; margin-bottom: 15px; }
+    .tab-btn { flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px; transition: 0.3s; }
 
-    button { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--primary); color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-    
-    #waveform { width: 100%; height: 120px; background: #eee; border-radius: 10px; display: block; }
+    label { font-size: 14px; margin-top: 15px; display: block; font-weight: bold; }
+    .slider-info { display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-top: 4px; }
+    input[type="range"] { width: 100%; margin-top: 8px; cursor: pointer; }
+
+    button { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--primary); color: white; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
     
     #downloadBtn { display: none; margin-top: 12px; text-align: center; padding: 15px; background: var(--success); color: white; text-decoration: none; border-radius: 12px; font-weight: bold; }
-    .btn-new { background: #666; }
+    
+    /* Приховування кроків */
+    #step-2, #step-3 { display: none; }
   </style>
 </head>
 <body>
@@ -65,64 +84,68 @@
 <div class="bg-circle"></div>
 
 <div id="processingOverlay">
-    <h2>Обработка видео...</h2>
-    <div id="overlayStatus" style="font-size: 30px; font-weight: bold; margin: 10px;">0%</div>
-    <div style="width: 80%; max-width: 400px; background: #333; height: 10px; border-radius: 5px; overflow: hidden;">
-        <div id="overlayBar" style="width: 0%; height: 100%; background: var(--primary); transition: 0.3s;"></div>
+    <h2 style="color:white">Обробка відео...</h2>
+    <div id="overlayPercent" style="font-size: 36px; font-weight: bold; margin: 10px;">0%</div>
+    <div style="width: 80%; max-width: 400px; background: #333; height: 12px; border-radius: 6px; overflow: hidden;">
+        <div id="overlayBar" style="width: 0%; height: 100%; background: var(--primary); transition: 0.2s;"></div>
     </div>
-    <p id="overlayEta" style="margin-top: 15px; opacity: 0.8;">Осталось: -- сек</p>
+    <p id="overlayEta" style="margin-top: 15px; opacity: 0.8;">Залишилось: -- сек</p>
 </div>
 
 <div class="app">
-  <div class="intro" id="intro-header">
+  <div class="intro-header" id="welcome">
     <h1>Pause Remover Pro</h1>
-    <p>Автоматичне видалення тиші з ваших відео за декілька секунд.</p>
+    <p>Видаляйте паузи автоматично та швидко</p>
   </div>
 
-  <div class="card" id="step-upload">
-    <h2>Загрузить видео</h2>
-    <input type="file" id="fileInput" accept="video/*">
+  <div class="card" id="step-1">
+    <h2>Завантажте відео</h2>
+    <div class="file-input-container">
+      <input type="file" id="fileInput" accept="video/*">
+    </div>
   </div>
 
-  <div class="card" id="step-editor">
-    <div style="display: flex; background: #eee; border-radius: 10px; padding: 4px; margin-bottom: 15px;">
-      <div id="tabAuto" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px; background: var(--primary); color: white; font-weight: bold;">Авто</div>
-      <div id="tabManual" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px;">Вручную</div>
-    </div>
+  <div id="step-2">
+    <div class="card">
+      <div class="tabs">
+        <div id="tabAuto" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px; background: var(--primary); color: white; font-weight: bold;">Авто</div>
+        <div id="tabManual" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px;">Вручную</div>
+      </div>
 
-    <div id="manualControls" style="display: none;">
-      <label>Минимальная тишина</label>
-      <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
-      <div class="slider-info"><span>Короткие паузы</span><span id="durationVal">0.5 сек</span></div>
-      <label>Чувствительность (dB)</label>
-      <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
-      <div class="slider-info"><span>Тише</span><span id="thresholdVal">-35 dB</span></div>
-    </div>
+      <div id="manualControls" style="display: none;">
+        <label>Минимальная тишина</label>
+        <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
+        <div class="slider-info"><span>Короткие паузи</span><span id="durationVal">0.5 сек</span></div>
+        <label>Чувствительность (dB)</label>
+        <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
+        <div class="slider-info"><span>Тише</span><span id="thresholdVal">-35 dB</span></div>
+      </div>
 
-    <div id="autoInfo" style="padding: 10px; font-size: 14px; background: #f0f7ff; border-radius: 10px; border: 1px solid #d0e0ff; margin-bottom: 10px;">
-      ✨ Режим «Авто» подберет настройки под ваш звук.
-    </div>
+      <div id="autoInfo" style="padding: 10px; font-size: 14px; background: #f0f7ff; border-radius: 10px; border: 1px solid #d0e0ff; margin-bottom: 10px;">
+        ✨ Режим «Авто» підбере налаштування автоматично.
+      </div>
 
-    <div style="margin: 15px 0;">
-        <label>Анализ звука (серый):</label>
-        <canvas id="waveform"></canvas>
-    </div>
+      <label>Аналіз звуку:</label>
+      <canvas id="waveform"></canvas>
 
-    <div class="progress-container" id="progCont" style="display: none;">
-      <div id="statusText">Ожидание...</div>
-      <div id="progressBar"></div>
-      <div id="etaText"></div>
-    </div>
+      <div id="progCont" style="display:none">
+          <div id="statusText">0%</div>
+          <div id="progressBar" style="width:0%"></div>
+          <div id="etaText"></div>
+      </div>
 
-    <button id="processBtn">Запустить обработку</button>
+      <button id="processBtn">Запустити обробку</button>
+    </div>
   </div>
 
-  <div class="card" id="step-result">
-    <div class="video-wrap">
+  <div id="step-3">
+    <div class="card">
+      <div class="video-wrap">
         <video id="preview" controls></video>
+      </div>
+      <a id="downloadBtn" download="no_pauses.mp4">Скачати готове відео</a>
+      <button style="background:#666" onclick="location.reload()">Нове відео</button>
     </div>
-    <a id="downloadBtn" download="no_pauses.mp4">Скачать готовое видео</a>
-    <button class="btn-new" onclick="location.reload()">Новое видео</button>
   </div>
 </div>
 
@@ -130,62 +153,63 @@
 <script src="script.js"></script>
 
 <script>
-    // ЛОГІКА ДИЗАЙНУ (не зачіпає script.js)
-    const fileInput = document.getElementById('fileInput');
-    const processBtn = document.getElementById('processBtn');
-    const overlay = document.getElementById('processingOverlay');
-    const downloadBtn = document.getElementById('downloadBtn');
+  const fInput = document.getElementById('fileInput');
+  const step1 = document.getElementById('step-1');
+  const step2 = document.getElementById('step-2');
+  const step3 = document.getElementById('step-3');
+  const welcome = document.getElementById('welcome');
+  const overlay = document.getElementById('processingOverlay');
 
-    // 1. Поява блоків після вибору файлу
-    fileInput.addEventListener('change', () => {
-        if (fileInput.files.length > 0) {
-            document.getElementById('step-upload').style.display = 'none';
-            document.getElementById('intro-header').style.display = 'none';
-            document.getElementById('step-editor').style.display = 'block';
-        }
-    });
+  // Показ блоків після завантаження
+  fInput.addEventListener('change', () => {
+    if (fInput.files.length > 0) {
+      step1.style.display = 'none';
+      welcome.style.display = 'none';
+      step2.style.display = 'block';
+    }
+  });
 
-    // 2. Оверлей при натисканні кнопки
-    processBtn.addEventListener('click', () => {
-        overlay.style.display = 'flex';
-    });
+  // Оверлей при старті обробки
+  document.getElementById('processBtn').onclick = () => {
+    overlay.style.display = 'flex';
+  };
 
-    // 3. Синхронізація прогресу з оверлеєм
-    const realBar = document.getElementById('progressBar');
-    const realStatus = document.getElementById('statusText');
-    const realEta = document.getElementById('etaText');
+  // Слідкуємо за прогресом для оверлею та фіналу
+  const realBar = document.getElementById('progressBar');
+  const realStatus = document.getElementById('statusText');
+  const realEta = document.getElementById('etaText');
+  const dlBtn = document.getElementById('downloadBtn');
 
-    const observer = new MutationObserver(() => {
-        document.getElementById('overlayBar').style.width = realBar.style.width;
-        document.getElementById('overlayStatus').innerText = realStatus.innerText;
-        document.getElementById('overlayEta').innerText = realEta.innerText;
+  const observer = new MutationObserver(() => {
+    // Оновлюємо дані в оверлеї
+    document.getElementById('overlayBar').style.width = realBar.style.width;
+    document.getElementById('overlayPercent').innerText = realStatus.innerText;
+    document.getElementById('overlayEta').innerText = realEta.innerText;
 
-        // Коли з'являється кнопка "Скачать", ховаємо все і показуємо результат
-        if (window.getComputedStyle(downloadBtn).display === 'block') {
-            overlay.style.display = 'none';
-            document.getElementById('step-editor').style.display = 'none';
-            document.getElementById('step-result').style.display = 'block';
-        }
-    });
+    // Якщо з'явилася кнопка скачування — переходимо до фіналу
+    if (window.getComputedStyle(dlBtn).display === 'block') {
+      overlay.style.display = 'none';
+      step2.style.display = 'none';
+      step3.style.display = 'block';
+    }
+  });
 
-    observer.observe(realBar, { attributes: true });
-    observer.observe(realStatus, { childList: true, characterData: true, subtree: true });
+  observer.observe(realBar, { attributes: true });
+  observer.observe(realStatus, { childList: true, characterData: true, subtree: true });
 
-    // 4. Перемикання табів (дизайн)
-    const tAuto = document.getElementById('tabAuto');
-    const tManual = document.getElementById('tabManual');
-    tAuto.onclick = () => {
-        tAuto.style.background = 'var(--primary)'; tAuto.style.color = 'white';
-        tManual.style.background = 'none'; tManual.style.color = '#333';
-        document.getElementById('manualControls').style.display = 'none';
-        document.getElementById('autoInfo').style.display = 'block';
-    };
-    tManual.onclick = () => {
-        tManual.style.background = 'var(--primary)'; tManual.style.color = 'white';
-        tAuto.style.background = 'none'; tAuto.style.color = '#333';
-        document.getElementById('manualControls').style.display = 'block';
-        document.getElementById('autoInfo').style.display = 'none';
-    };
+  // Таби дизайну (вони працюють паралельно з логікою)
+  const btnAuto = document.getElementById('tabAuto');
+  const btnManual = document.getElementById('tabManual');
+  
+  btnAuto.addEventListener('click', () => {
+    btnAuto.style.background = 'var(--primary)'; btnAuto.style.color = 'white';
+    btnManual.style.background = 'none'; btnManual.style.color = '#333';
+  });
+  
+  btnManual.addEventListener('click', () => {
+    btnManual.style.background = 'var(--primary)'; btnManual.style.color = 'white';
+    btnAuto.style.background = 'none'; btnAuto.style.color = '#333';
+  });
 </script>
 
 </body>
