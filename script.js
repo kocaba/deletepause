@@ -8,6 +8,12 @@ const ffmpeg = createFFmpeg({ log: true });
 let loaded = false;
 let logs = [];
 
+// для прогресса
+let currentProgress = 0;
+
+// для anti-sleep
+let wakeLock = null;
+
 
 // =========================
 // STATE
@@ -26,10 +32,55 @@ function setStatus(text) {
 
 
 // =========================
-// LOGGER
+// WAKE LOCK (анти-сон)
+// =========================
+async function enableWakeLock() {
+  try {
+    if ("wakeLock" in navigator) {
+      wakeLock = await navigator.wakeLock.request("screen");
+      console.log("WakeLock включен");
+    }
+  } catch (e) {
+    console.log("WakeLock ошибка:", e);
+  }
+}
+
+function disableWakeLock() {
+  if (wakeLock) {
+    wakeLock.release();
+    wakeLock = null;
+    console.log("WakeLock выключен");
+  }
+}
+
+
+// =========================
+// LOGGER + PROGRESS
 // =========================
 ffmpeg.setLogger(({ message }) => {
+
   logs.push(message);
+
+  const match = message.match(/time=(\d+):(\d+):(\d+\.?\d*)/);
+
+  if (match && audioDuration) {
+
+    const h = +match[1];
+    const m = +match[2];
+    const s = +match[3];
+
+    const currentTime = h * 3600 + m * 60 + s;
+
+    const percent = Math.min(100, (currentTime / audioDuration) * 100);
+
+    if (percent - currentProgress > 1) {
+      currentProgress = percent;
+
+      setStatus(
+        `Обработка: ${currentTime.toFixed(1)} / ${audioDuration.toFixed(1)} сек (${percent.toFixed(0)}%)`
+      );
+    }
+  }
 });
 
 
@@ -63,7 +114,7 @@ async function loadAudioData(file) {
 
 
 // =========================
-// DETECT SILENCE (оставил как есть)
+// DETECT SILENCE
 // =========================
 function detectSilencePCM(thresholdDb, minDuration) {
 
@@ -160,7 +211,7 @@ function drawWaveform() {
 
 
 // =========================
-// FILE LOAD (НЕ ТРОГАЛ)
+// FILE LOAD
 // =========================
 document.getElementById("fileInput").onchange = async (e) => {
 
@@ -203,7 +254,7 @@ function buildSegments(silences, duration) {
 
 
 // =========================
-// MAIN PROCESS (НОВЫЙ)
+// MAIN PROCESS
 // =========================
 document.getElementById("processBtn").onclick = async () => {
 
@@ -212,16 +263,21 @@ document.getElementById("processBtn").onclick = async () => {
 
   await loadFFmpeg();
 
+  currentProgress = 0;
+
+  // 🔥 включаем анти-сон
+  await enableWakeLock();
+
   setStatus("Анализ тишины...");
 
   const threshold = parseFloat(document.getElementById("threshold").value);
   const duration = parseFloat(document.getElementById("duration").value);
 
-  // 🔥 используем твой анализ
   const silences = detectSilencePCM(threshold, duration);
 
   if (!silences.length) {
     setStatus("Тишина не найдена");
+    disableWakeLock();
     return;
   }
 
@@ -238,9 +294,6 @@ document.getElementById("processBtn").onclick = async () => {
 
   ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
-  // =====================
-  // СОЗДАЁМ FILTER
-  // =====================
   let filter = "";
   let concatInputs = "";
 
@@ -254,9 +307,6 @@ document.getElementById("processBtn").onclick = async () => {
 
   filter += `${concatInputs}concat=n=${segments.length}:v=1:a=1[outv][outa]`;
 
-  // =====================
-  // ОДИН ffmpeg.run
-  // =====================
   setStatus("Обработка...");
 
   await ffmpeg.run(
@@ -269,6 +319,8 @@ document.getElementById("processBtn").onclick = async () => {
     "-c:a", "aac",
     "output.mp4"
   );
+
+  disableWakeLock();
 
   setStatus("Готово");
 
