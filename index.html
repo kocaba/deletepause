@@ -5,73 +5,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pause Remover Pro - WebProgger</title>
     <style>
-        :root { --p-clr: #2b6cff; --s-clr: #00b894; --b-clr: #000; }
+        :root { --p-clr: #2b6cff; --s-clr: #00b894; --b-clr: #050505; }
         * { box-sizing: border-box; }
         body { 
-            margin: 0; font-family: -apple-system, sans-serif; background: var(--b-clr); 
-            display: flex; flex-direction: column; align-items: center; color: #333; min-height: 100vh;
-            /* Збільшений відступ зверху, щоб хедер не закривав контент */
-            padding-top: 110px; 
-        }
-        
-        /* ГРАДІЄНТНИЙ ФОН */
-        .bg_fx_99 {
-            position: fixed; width: 600px; height: 600px;
-            background: radial-gradient(circle, #1e3a8a 0%, rgba(0,0,0,0) 70%);
-            border-radius: 50%; filter: blur(80px); z-index: -1; top: 10%; left: -10%;
+            margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+            background: var(--b-clr); color: #fff; min-height: 100vh;
+            display: flex; flex-direction: column; align-items: center;
+            padding-top: 120px; overflow-x: hidden;
         }
 
-        .main_app_v3 { width: 100%; max-width: 600px; padding: 0 20px; z-index: 1; flex: 1; }
-        
-        .card_shd_42 { 
-            background: rgba(255, 255, 255, 0.98); border-radius: 20px; padding: 25px; 
-            margin-bottom: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
+        /* ДИНАМІЧНА АНІМАЦІЯ ФОНУ */
+        .bg_anim {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: -1; overflow: hidden; background: #000;
+        }
+        .blob {
+            position: absolute; width: 500px; height: 500px;
+            background: radial-gradient(circle, rgba(43,108,255,0.4) 0%, rgba(0,0,0,0) 70%);
+            border-radius: 50%; filter: blur(60px);
+            animation: move 8s infinite alternate ease-in-out;
+        }
+        .blob-2 {
+            width: 400px; height: 400px; left: 60%; top: 40%;
+            background: radial-gradient(circle, rgba(30,58,138,0.5) 0%, rgba(0,0,0,0) 70%);
+            animation-duration: 6s; animation-delay: -2s;
+        }
+        @keyframes move {
+            0% { transform: translate(-20%, -20%) scale(1); }
+            100% { transform: translate(40%, 30%) scale(1.3); }
         }
 
-        h2 { text-align: center; margin-top: 0; color: var(--p-clr); font-size: 24px; }
+        /* ХЕДЕР */
+        header div.f_head {
+            padding-top: 16px; width: 100%; min-height: 75px; position: fixed; 
+            top: 0; left: 0; z-index: 999999; background: rgba(255,255,255,0.95); 
+            backdrop-filter: blur(10px); border-bottom: 1px solid #ddd;
+        }
+
+        .main_app_v3 { width: 100%; max-width: 600px; padding: 0 20px; z-index: 10; flex: 1; }
         
-        /* БЛОК ЗАВАНТАЖЕННЯ */
+        /* КАРТКА ЗАВАНТАЖЕННЯ */
+        .card_main { 
+            background: #fff; border-radius: 24px; padding: 30px; 
+            margin-bottom: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); color: #333;
+        }
+        h2 { text-align: center; margin-top: 0; color: var(--p-clr); font-size: 26px; font-weight: 800; }
+        
         .f_inp_88 { 
-            width: 100%; padding: 50px 20px; border: 2px dashed #ccc; border-radius: 12px; 
-            cursor: pointer; background: #fff; text-align: center; font-weight: bold; 
-            transition: 0.3s; color: #666;
+            width: 100%; padding: 60px 20px; border: 3px dashed #e0e0e0; border-radius: 16px; 
+            cursor: pointer; background: #f9f9f9; text-align: center; font-weight: bold; 
+            transition: 0.3s; color: #888; font-size: 18px;
         }
-        .f_inp_88:hover { border-color: var(--p-clr); color: var(--p-clr); }
-        
-        /* МІНІ-СТАТТЯ */
-        .article_section { color: #444; line-height: 1.6; }
-        .article_section h3 { color: #000; font-size: 18px; margin-top: 0; margin-bottom: 12px; border-left: 4px solid var(--p-clr); padding-left: 10px; }
-        .article_section p { margin-bottom: 15px; font-size: 15px; }
-        .article_section b { color: #222; }
+        .f_inp_88:hover { border-color: var(--p-clr); color: var(--p-clr); background: #f0f5ff; }
 
-        /* OVERLAY / PROGRESS */
+        /* ЛЕНДИНГ СЕКЦІЯ (БІЛИЙ ТЕКСТ) */
+        .landing_content { margin-top: 20px; padding-bottom: 50px; }
+        .step_card { 
+            display: flex; align-items: flex-start; gap: 15px; margin-bottom: 30px;
+            background: rgba(255,255,255,0.05); padding: 20px; border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.1); transition: 0.3s;
+        }
+        .step_card:hover { background: rgba(255,255,255,0.08); transform: translateY(-5px); }
+        .step_num { 
+            background: var(--p-clr); color: white; width: 35px; height: 35px; 
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; flex-shrink: 0; font-size: 18px;
+        }
+        .step_txt h4 { margin: 0 0 8px 0; font-size: 18px; color: #fff; }
+        .step_txt p { margin: 0; color: #ccc; font-size: 15px; line-height: 1.5; }
+
+        /* PROGRESS OVERLAY */
         #ov_scr_55 {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.96); z-index: 9999999; flex-direction: column;
-            justify-content: center; align-items: center; color: white; text-align: center;
+            background: rgba(0,0,0,0.98); z-index: 9999999; flex-direction: column;
+            justify-content: center; align-items: center; color: white;
         }
-        .p_bar_bg { width: 80%; max-width: 400px; height: 12px; background: #333; border-radius: 6px; overflow: hidden; margin: 20px 0; }
-        #p_bar_fill { width: 0%; height: 100%; background: var(--p-clr); transition: 0.3s; }
+        .p_bar_bg { width: 80%; max-width: 400px; height: 10px; background: #222; border-radius: 5px; overflow: hidden; margin: 25px 0; }
+        #p_bar_fill { width: 0%; height: 100%; background: var(--p-clr); box-shadow: 0 0 15px var(--p-clr); }
         
-        /* EDITOR & TABS */
-        .tabs_row { display: flex; background: #eee; border-radius: 10px; padding: 4px; margin-bottom: 15px; }
-        .tab_btn { flex: 1; text-align: center; padding: 10px; cursor: pointer; border-radius: 8px; font-weight: bold; transition: 0.2s; font-size: 14px; }
+        /* INTERFACE ELEMENTS */
+        .tabs_row { display: flex; background: #f0f0f0; border-radius: 12px; padding: 5px; margin-bottom: 20px; }
+        .tab_btn { flex: 1; text-align: center; padding: 12px; cursor: pointer; border-radius: 10px; font-weight: 700; color: #666; }
         .active_t { background: var(--p-clr); color: white; }
         
-        label { font-size: 13px; font-weight: bold; margin-top: 10px; display: block; }
-        input[type="range"] { width: 100%; cursor: pointer; margin: 10px 0; }
-        .info_box { padding: 12px; font-size: 14px; background: #f0f7ff; border-radius: 10px; border: 1px solid #d0e0ff; margin-bottom: 10px; }
+        .btn_prim { 
+            width: 100%; padding: 18px; border: none; border-radius: 16px; 
+            background: var(--p-clr); color: white; font-size: 17px; font-weight: bold; 
+            cursor: pointer; box-shadow: 0 8px 20px rgba(43,108,255,0.3);
+        }
         
-        #wv_cvs_11 { width: 100%; height: 120px; background: #fafafa; border-radius: 10px; border: 1px solid #eee; display: block; margin: 15px 0; }
-        .v_pre_cnt { display: flex; justify-content: center; width: 100%; background: #000; border-radius: 12px; overflow: hidden; margin-bottom: 15px; }
-        #vid_pre_77 { width: 100%; max-height: 350px; }
-        
-        .btn_prim { width: 100%; padding: 16px; border: none; border-radius: 14px; background: var(--p-clr); color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn_prim:disabled { background: #555; cursor: wait; }
-        #dl_btn_99 { display: none; margin-top: 12px; text-align: center; padding: 16px; background: var(--s-clr); color: white; text-decoration: none; border-radius: 14px; font-weight: bold; }
-        
-        /* FOOTER */
-        footer { width: 100%; background: #111; color: #888; padding: 30px 20px; text-align: center; font-size: 14px; border-top: 1px solid #222; margin-top: 40px; }
+        #wv_cvs_11 { width: 100%; height: 120px; background: #fff; border-radius: 12px; border: 1px solid #ddd; margin: 15px 0; }
+
+        footer { width: 100%; padding: 40px 20px; text-align: center; color: #666; font-size: 14px; border-top: 1px solid #222; }
         footer a { color: #fff; text-decoration: none; font-weight: bold; }
 
         .hidden_node { display: none !important; }
@@ -79,86 +104,105 @@
 </head>
 <body>
 
+<div class="bg_anim">
+    <div class="blob"></div>
+    <div class="blob blob-2"></div>
+</div>
+
 <header>
-    <div style="padding-top: 16px;width:100%;min-height:75px;position:fixed;top:0;left:0;z-index:999999;background:white;border-bottom:1px solid #ddd">
+    <div class="f_head">
         <div style="width:95%;max-width:1200px;margin:0 auto;padding:10px 15px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap">
             <div style="display:flex;align-items:center;gap:12px;flex:1;min-width:120px">
                 <div style="display:flex;flex-direction:column;line-height:1.2;max-width:240px">
                     <span style="font-size:20px;font-weight:bold;color:#000">
                         <a href="https://webprogger.wordpress.com/" style="text-decoration:none">Web<span style="color:darkblue">Progger</span></a>
                     </span>
-                    <div style="margin:0;padding:0;font-size:14px;color:#444">Professional Video Tools</div>
+                    <div style="font-size:14px;color:#444">Professional AI Video Creator</div>
                 </div>
             </div>
         </div>
     </div>
 </header>
 
-<div class="bg_fx_99"></div>
-
 <div id="ov_scr_55">
-    <h2 style="color:white" id="ov_title">Обробка відео...</h2>
-    <div id="ov_pct" style="font-size: 50px; font-weight: 900; color: var(--p-clr);">0%</div>
+    <h2 style="color:white" id="ov_title">Інтелектуальна обробка...</h2>
+    <div id="ov_pct" style="font-size: 60px; font-weight: 900; color: var(--p-clr);">0%</div>
     <div class="p_bar_bg"><div id="p_bar_fill"></div></div>
-    <div id="ov_eta" style="opacity: 0.7;">Аналізуємо кадри...</div>
+    <div id="ov_eta" style="opacity: 0.6; letter-spacing: 1px;">МОНТАЖ У ПРОЦЕСІ</div>
 </div>
 
 <div class="main_app_v3">
+    
     <div id="step_file">
-        <div class="card_shd_42">
+        <div class="card_main">
             <h2>Pause Remover Pro</h2>
             <div class="f_inp_88" onclick="document.getElementById('real_f').click()">
-                Виберіть розмовне відео для очистки
+                <div style="font-size:40px; margin-bottom:10px;">📁</div>
+                Завантажити відео для монтажу
                 <input type="file" id="real_f" accept="video/*" style="display:none">
             </div>
         </div>
 
-        <div class="card_shd_42 article_section">
-            <h3>Професійний монтаж без зайвих зусиль</h3>
-            <p>Запис розмовних відео для соціальних мереж часто супроводжується великою кількістю пауз. Коли ви читаєте текст з екрана або згадуєте наступну тезу, камера продовжує запис, створюючи "порожні" моменти, які доводиться вручну вирізати годинами.</p>
+        <div class="landing_content">
+            <h3 style="text-align: center; font-size: 24px; margin-bottom: 30px;">Як створити ідеальне відео за 3 кроки:</h3>
             
-            <h3>Як це працює</h3>
-            <p>Система автоматично сканує звукову доріжку вашого ролика, ідентифікує всі моменти тиші та миттєво їх видаляє. Ви отримуєте безперервний потік мовлення, де кожна ваша фраза логічно слідує за попередньою.</p>
-            
-            <p><b>Результат:</b> Динамічний контент, готовий до публікації. Вам більше не потрібно самостійно шукати кожну зупинку на таймлайні — інструмент зробить це за вас за лічені секунди.</p>
+            <div class="step_card">
+                <div class="step_num">1</div>
+                <div class="step_txt">
+                    <h4>Запишіть свій виступ</h4>
+                    <p>Прочитайте речення зі сценарію в камеру. Потім спокійно знайдіть наступну тезу, прочитайте її та знову говоріть. Не хвилюйтеся про паузи — просто будьте собою.</p>
+                </div>
+            </div>
+
+            <div class="step_card">
+                <div class="step_num">2</div>
+                <div class="step_txt">
+                    <h4>Автоматичний монтаж</h4>
+                    <p>Завантажте отриманий файл у Pause Remover Pro. Наша система знайде кожну секунду, поки ви читали текст або мовчали, і миттєво виріже ці фрагменти.</p>
+                </div>
+            </div>
+
+            <div class="step_card">
+                <div class="step_num">3</div>
+                <div class="step_txt">
+                    <h4>Публікуйте в мережі</h4>
+                    <p>Завантажте готовий результат. Тепер ваше відео динамічне, професійне та без жодних заминок. Ідеально для Reels, TikTok та YouTube Shorts.</p>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="card_shd_42 hidden_node" id="step_editor">
+    <div class="card_main hidden_node" id="step_editor">
         <div class="tabs_row">
-            <div id="t_auto" class="tab_btn active_t">Авто</div>
-            <div id="t_manual" class="tab_btn">Вручну</div>
+            <div id="t_auto" class="tab_btn active_t">Авто-режим</div>
+            <div id="t_manual" class="tab_btn">Ручна настройка</div>
         </div>
-
         <div id="m_cntrls" class="hidden_node">
             <label>Довжина пауз</label>
             <input type="range" id="val_dur" min="0.1" max="2.0" step="0.05" value="0.5">
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:#666"><span>Чутливість</span><span id="txt_dur">0.5 сек</span></div>
-            
-            <label>Рівень тиші (dB)</label>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#888"><span>Чутливість</span><span id="txt_dur">0.5 сек</span></div>
+            <label>Поріг тиші (dB)</label>
             <input type="range" id="val_db" min="-60" max="-10" step="1" value="-35">
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:#666"><span>Поріг</span><span id="txt_db">-35 dB</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#888"><span>Рівень</span><span id="txt_db">-35 dB</span></div>
         </div>
-
-        <div id="a_info" class="info_box">✨ Параметри підібрано під ваш голос.</div>
-
+        <div id="a_info" class="info_box">✨ Оптимальні налаштування для вашого голосу підібрано.</div>
         <canvas id="wv_cvs_11"></canvas>
-        <button id="go_proc" class="btn_prim">Почати видалення пауз</button>
+        <button id="go_proc" class="btn_prim">Запустити інтелектуальну склейку</button>
     </div>
 
-    <div class="card_shd_42 hidden_node" id="step_result">
-        <div class="v_pre_cnt">
-            <video id="vid_pre_77" controls></video>
+    <div class="card_main hidden_node" id="step_result">
+        <div class="v_pre_cnt" style="background:#000; border-radius:12px; margin-bottom:20px;">
+            <video id="vid_pre_77" controls style="width:100%;"></video>
         </div>
-        <a id="dl_btn_99" download="result_clean.mp4">Скачати готове відео</a>
-        <button class="btn_prim" style="background:#555;margin-top:10px" onclick="location.reload()">Обробити нове відео</button>
+        <a id="dl_btn_99" download="video_ready.mp4" style="display:none; text-align:center; padding:18px; background:var(--s-clr); color:white; text-decoration:none; border-radius:16px; font-weight:bold; margin-bottom:10px;">Скачати готовий ролик</a>
+        <button class="btn_prim" style="background:#444; box-shadow:none;" onclick="location.reload()">Нове відео</button>
     </div>
 </div>
 
 <footer>
     <div>© 2026 Pause Remover Pro</div>
     <div style="margin-top:10px">
-        Розроблено за підтримки <a href="https://webprogger.wordpress.com/">WebProgger</a>
+        Створено для творців контенту на безкоштовній основі за підтримки <a href="https://webprogger.wordpress.com/">Сергія Коцаби</a>
     </div>
 </footer>
 
@@ -167,8 +211,7 @@
 const { createFFmpeg, fetchFile } = FFmpeg;
 const ffmpeg = createFFmpeg({ log: false, corePath: './ffmpeg/ffmpeg-core.js' });
 
-let aBuffer = null, cRMS = [], aDur = 0, sRate = 44100, isLoaded = false, cMode = 'auto';
-let wakeLock = null;
+let aBuffer = null, cRMS = [], aDur = 0, sRate = 44100, isLoaded = false, cMode = 'auto', wakeLock = null;
 
 const dom = {
     fInp: document.getElementById('real_f'),
@@ -178,66 +221,31 @@ const dom = {
     ov: document.getElementById('ov_scr_55'),
     bar: document.getElementById('p_bar_fill'),
     ovPct: document.getElementById('ov_pct'),
-    ovEta: document.getElementById('ov_eta'),
     cvs: document.getElementById('wv_cvs_11'),
     btnGo: document.getElementById('go_proc'),
     vPre: document.getElementById('vid_pre_77'),
     dl: document.getElementById('dl_btn_99'),
     dur: document.getElementById('val_dur'),
-    db: document.getElementById('val_db'),
-    ovTitle: document.getElementById('ov_title')
+    db: document.getElementById('val_db')
 };
 
-async function requestWakeLock() {
-    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
-}
-
-function releaseWakeLock() {
-    if (wakeLock !== null) { wakeLock.release().then(() => { wakeLock = null; }); }
-}
+async function lock() { try { if('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} }
+function unlock() { if(wakeLock) { wakeLock.release(); wakeLock = null; } }
 
 function setTab(m) {
     cMode = m;
-    document.getElementById('t_auto').classList.toggle('active_t', m === 'auto');
-    document.getElementById('t_manual').classList.toggle('active_t', m === 'manual');
-    document.getElementById('m_cntrls').classList.toggle('hidden_node', m === 'auto');
-    document.getElementById('a_info').classList.toggle('hidden_node', m === 'manual');
-    if (aBuffer) draw();
+    document.getElementById('t_auto').classList.toggle('active_t', m==='auto');
+    document.getElementById('t_manual').classList.toggle('active_t', m==='manual');
+    document.getElementById('m_cntrls').classList.toggle('hidden_node', m==='auto');
+    document.getElementById('a_info').classList.toggle('hidden_node', m==='manual');
+    if(aBuffer) draw();
 }
 document.getElementById('t_auto').onclick = () => setTab('auto');
 document.getElementById('t_manual').onclick = () => setTab('manual');
 
-function preRMS() {
-    cRMS = []; const step = 1024;
-    for (let i = 0; i < aBuffer.length; i += step) {
-        let s = 0;
-        for (let j = 0; j < step; j++) { const v = aBuffer[i+j]||0; s += v*v; }
-        cRMS.push(Math.sqrt(s/step));
-    }
-}
-
-function getAuto() {
-    const s = [...cRMS].sort((a,b)=>a-b);
-    const n = s[Math.floor(s.length*0.1)] || 0.001;
-    let db = Math.round(20 * Math.log10(n + 1e-6) + 8);
-    return { db: Math.min(-30, Math.max(-45, db)), dur: aDur > 60 ? 0.6 : 0.45 };
-}
-
-function findS(db, dur) {
-    const lim = Math.pow(10, db/20), res = []; let st = null;
-    const bT = 1024/sRate;
-    cRMS.forEach((v, i) => {
-        const t = i * bT;
-        if (v < lim) { if (st === null) st = t; }
-        else if (st !== null) { if (t - st >= dur) res.push({st, en: t}); st = null; }
-    });
-    return res;
-}
-
 function draw() {
     const ctx = dom.cvs.getContext('2d');
-    dom.cvs.width = dom.cvs.clientWidth;
-    dom.cvs.height = dom.cvs.clientHeight;
+    dom.cvs.width = dom.cvs.clientWidth; dom.cvs.height = dom.cvs.clientHeight;
     const w = dom.cvs.width, h = dom.cvs.height;
     ctx.clearRect(0,0,w,h);
     if(!aBuffer) return;
@@ -251,54 +259,51 @@ function draw() {
         }
         ctx.fillRect(i, (1+min)*(h/2), 1, Math.max(1,(max-min)*(h/2)));
     }
-    const p = cMode==='auto' ? getAuto() : {db: parseFloat(dom.db.value), dur: parseFloat(dom.dur.value)};
-    const sil = findS(p.db, p.dur);
-    ctx.fillStyle = "rgba(255, 50, 50, 0.4)";
-    sil.forEach(s => {
-        const x1 = (s.st/aDur)*w, x2 = (s.en/aDur)*w;
-        ctx.fillRect(x1, 0, x2-x1, h);
-    });
 }
 
 dom.fInp.onchange = async (e) => {
     const file = e.target.files[0]; if(!file) return;
-    dom.ovTitle.innerText = "Сканування...";
-    dom.ovPct.innerText = "";
     dom.ov.style.display = 'flex';
     const aCtx = new (window.AudioContext || window.webkitAudioContext)();
     try {
         const arrayBuf = await file.arrayBuffer();
         const dec = await aCtx.decodeAudioData(arrayBuf);
         aBuffer = dec.getChannelData(0); aDur = dec.duration; sRate = dec.sampleRate;
-        preRMS();
+        const s = 1024; cRMS = [];
+        for (let i = 0; i < aBuffer.length; i += s) {
+            let sum = 0; for (let j = 0; j < s; j++) { const v = aBuffer[i+j]||0; sum += v*v; }
+            cRMS.push(Math.sqrt(sum/s));
+        }
         dom.sFile.classList.add('hidden_node');
         dom.sEdit.classList.remove('hidden_node');
         draw();
         dom.vPre.src = URL.createObjectURL(file);
         dom.ov.style.display = 'none';
-    } catch (err) {
-        alert("Помилка читання файлу.");
-        dom.ov.style.display = 'none';
-    }
+    } catch (err) { alert("Помилка файлу."); dom.ov.style.display = 'none'; }
 };
 
-dom.dur.oninput = () => { document.getElementById('txt_dur').innerText = dom.dur.value+" сек"; draw(); };
-dom.db.oninput = () => { document.getElementById('txt_db').innerText = dom.db.value+" dB"; draw(); };
+function getP() {
+    const s = [...cRMS].sort((a,b)=>a-b);
+    const n = s[Math.floor(s.length*0.1)] || 0.001;
+    let db = Math.round(20 * Math.log10(n + 1e-6) + 8);
+    return { db: Math.min(-30, Math.max(-45, db)), dur: aDur > 60 ? 0.6 : 0.45 };
+}
 
 dom.btnGo.onclick = async () => {
     const file = dom.fInp.files[0]; if(!file) return;
     dom.btnGo.disabled = true;
-    await requestWakeLock();
-    dom.ovTitle.innerText = "Обробка...";
-    dom.ovPct.innerText = "0%";
-    dom.bar.style.width = "0%";
+    await lock();
     dom.ov.style.display = 'flex';
-    if(!isLoaded) { 
-        dom.ovTitle.innerText = "Завантаження компонентів...";
-        await ffmpeg.load(); isLoaded = true; 
-    }
-    const p = cMode==='auto' ? getAuto() : {db: parseFloat(dom.db.value), dur: parseFloat(dom.dur.value)};
-    const sil = findS(p.db, p.dur);
+    if(!isLoaded) { await ffmpeg.load(); isLoaded = true; }
+    
+    const p = cMode==='auto' ? getP() : {db: parseFloat(dom.db.value), dur: parseFloat(dom.dur.value)};
+    const lim = Math.pow(10, p.db/20), sil = []; let st = null; const bT = 1024/sRate;
+    cRMS.forEach((v, i) => {
+        const t = i * bT;
+        if (v < lim) { if (st === null) st = t; }
+        else if (st !== null) { if (t - st >= p.dur) sil.push({st, en: t}); st = null; }
+    });
+
     const segs = []; let prev = 0, PAD = 0.1;
     sil.forEach(s => {
         if(s.st > prev) segs.push({s: Math.max(0, prev-(prev===0?0:PAD)), e: s.st+PAD});
@@ -306,7 +311,8 @@ dom.btnGo.onclick = async () => {
     });
     if(prev < aDur) segs.push({s: Math.max(0, prev-PAD), e: aDur});
     const tOut = segs.reduce((a,s)=>a+(s.e-s.s), 0);
-    ffmpeg.FS("writeFile", "src.mp4", await fetchFile(file));
+    
+    ffmpeg.FS("writeFile", "in.mp4", await fetchFile(file));
     let f = "", c = "";
     segs.forEach((s, i) => {
         f += `[0:v]trim=start=${s.s.toFixed(3)}:end=${s.e.toFixed(3)},setpts=PTS-STARTPTS[v${i}];`;
@@ -315,7 +321,6 @@ dom.btnGo.onclick = async () => {
     });
     f += `${c}concat=n=${segs.length}:v=1:a=1[v][a]`;
 
-    let startT = Date.now();
     ffmpeg.setLogger(({message}) => {
         const m = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
         if(m){
@@ -323,27 +328,19 @@ dom.btnGo.onclick = async () => {
             const pct = Math.min(100, (t/tOut)*100);
             dom.bar.style.width = pct+"%";
             dom.ovPct.innerText = pct.toFixed(0)+"%";
-            const elap = (Date.now()-startT)/1000;
-            const eta = Math.round((tOut-t)/(t/elap));
-            dom.ovEta.innerText = (eta > 0 && pct < 100) ? `Залишилось: ~${eta} сек` : "Завершення...";
         }
     });
 
     try {
-        await ffmpeg.run("-i", "src.mp4", "-filter_complex", f, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28", "res.mp4");
-        const data = ffmpeg.FS("readFile", "res.mp4");
+        await ffmpeg.run("-i", "in.mp4", "-filter_complex", f, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "ultrafast", "out.mp4");
+        const data = ffmpeg.FS("readFile", "out.mp4");
         const url = URL.createObjectURL(new Blob([data.buffer], {type:"video/mp4"}));
         dom.vPre.src = url; dom.dl.href = url; dom.dl.style.display = "block";
         dom.ov.style.display = 'none';
         dom.sEdit.classList.add('hidden_node');
         dom.sRes.classList.remove('hidden_node');
-    } catch (e) {
-        alert("Помилка під час обробки.");
-        dom.ov.style.display = 'none';
-    } finally {
-        dom.btnGo.disabled = false;
-        releaseWakeLock();
-    }
+    } catch (e) { alert("Помилка."); dom.ov.style.display = 'none'; }
+    finally { dom.btnGo.disabled = false; unlock(); }
 };
 </script>
 </body>
