@@ -1,16 +1,11 @@
 // =========================
-// INIT FFMPEG
+// INIT
 // =========================
 const { createFFmpeg, fetchFile } = FFmpeg;
-
 const ffmpeg = createFFmpeg({ log: false });
 
 let loaded = false;
 
-
-// =========================
-// STATE
-// =========================
 let audioData = null;
 let audioDuration = 0;
 let sampleRate = 44100;
@@ -29,7 +24,7 @@ function setStatus(text) {
 // =========================
 async function loadFFmpeg() {
   if (!loaded) {
-    setStatus("Загрузка ffmpeg...");
+    setStatus("Загрузка...");
     await ffmpeg.load();
     loaded = true;
   }
@@ -40,11 +35,11 @@ async function loadFFmpeg() {
 // LOAD AUDIO
 // =========================
 async function loadAudioData(file) {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  await audioCtx.resume();
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  await ctx.resume();
 
   const buffer = await file.arrayBuffer();
-  const decoded = await audioCtx.decodeAudioData(buffer);
+  const decoded = await ctx.decodeAudioData(buffer);
 
   audioData = decoded.getChannelData(0);
   audioDuration = decoded.duration;
@@ -53,12 +48,12 @@ async function loadAudioData(file) {
 
 
 // =========================
-// FAST SILENCE DETECT
+// DETECT SILENCE (точнее)
 // =========================
 function detectSilencePCM(thresholdDb, minDuration) {
 
   const threshold = Math.pow(10, thresholdDb / 20);
-  const windowSize = 4096;
+  const windowSize = 2048;
 
   const silences = [];
   let silenceStart = null;
@@ -68,23 +63,21 @@ function detectSilencePCM(thresholdDb, minDuration) {
     let sum = 0;
 
     for (let j = 0; j < windowSize; j++) {
-      const sample = audioData[i + j] || 0;
-      sum += Math.abs(sample);
+      const s = audioData[i + j] || 0;
+      sum += s * s;
     }
 
-    const avg = sum / windowSize;
+    const rms = Math.sqrt(sum / windowSize);
     const time = i / sampleRate;
 
-    if (avg < threshold) {
+    if (rms < threshold) {
       if (silenceStart === null) silenceStart = time;
     } else {
       if (silenceStart !== null) {
         const dur = time - silenceStart;
-
         if (dur >= minDuration) {
           silences.push({ start: silenceStart, end: time });
         }
-
         silenceStart = null;
       }
     }
@@ -118,94 +111,7 @@ function buildSegments(silences, duration) {
 
 
 // =========================
-// DRAW WAVEFORM
-// =========================
-function drawWaveform() {
-
-  const canvas = document.getElementById("waveform");
-  const ctx = canvas.getContext("2d");
-
-  canvas.width = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
-
-  const width = canvas.width;
-  const height = canvas.height;
-
-  const step = Math.ceil(audioData.length / width);
-  const amp = height / 2;
-
-  ctx.clearRect(0, 0, width, height);
-
-  ctx.fillStyle = "#888";
-
-  for (let i = 0; i < width; i++) {
-
-    let min = 1;
-    let max = -1;
-
-    for (let j = 0; j < step; j++) {
-      const val = audioData[(i * step) + j] || 0;
-      if (val < min) min = val;
-      if (val > max) max = val;
-    }
-
-    ctx.fillRect(
-      i,
-      (1 + min) * amp,
-      1,
-      Math.max(1, (max - min) * amp)
-    );
-  }
-
-  const threshold = parseFloat(document.getElementById("threshold").value);
-  const duration = parseFloat(document.getElementById("duration").value);
-
-  const silences = detectSilencePCM(threshold, duration);
-
-  ctx.fillStyle = "rgba(255,0,0,0.3)";
-
-  silences.forEach(s => {
-    const x1 = (s.start / audioDuration) * width;
-    const x2 = (s.end / audioDuration) * width;
-    ctx.fillRect(x1, 0, x2 - x1, height);
-  });
-}
-
-
-// =========================
-// FILE LOAD
-// =========================
-document.getElementById("fileInput").onchange = async (e) => {
-
-  const file = e.target.files[0];
-  if (!file) return;
-
-  document.getElementById("preview").src =
-    URL.createObjectURL(file);
-
-  setStatus("Анализ аудио...");
-
-  await loadAudioData(file);
-  drawWaveform();
-
-  setStatus("Готово");
-};
-
-
-// =========================
-// LIVE UPDATE
-// =========================
-document.getElementById("threshold").oninput = () => {
-  if (audioData) drawWaveform();
-};
-
-document.getElementById("duration").oninput = () => {
-  if (audioData) drawWaveform();
-};
-
-
-// =========================
-// MAIN PROCESS (ФИКС РАССИНХРОНА)
+// MAIN PROCESS (ИДЕАЛ)
 // =========================
 document.getElementById("processBtn").onclick = async () => {
 
@@ -214,7 +120,7 @@ document.getElementById("processBtn").onclick = async () => {
 
   await loadFFmpeg();
 
-  setStatus("Анализ тишины...");
+  setStatus("Анализ...");
 
   const threshold = parseFloat(document.getElementById("threshold").value);
   const duration = parseFloat(document.getElementById("duration").value);
@@ -228,56 +134,43 @@ document.getElementById("processBtn").onclick = async () => {
 
   const segments = buildSegments(silences, audioDuration);
 
-  setStatus(`Сегментов: ${segments.length}`);
+  setStatus("Обработка...");
 
-  // загрузка файла
   ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
   // =====================
-  // РЕЗКА (FIX)
+  // СОЗДАЁМ FILTER
   // =====================
-  for (let i = 0; i < segments.length; i++) {
 
-    const s = segments[i];
+  let filter = "";
+  let concatInputs = "";
 
-    setStatus(`Режем ${i + 1}/${segments.length}`);
+  segments.forEach((s, i) => {
 
-    await ffmpeg.run(
-      "-ss", String(s.start),
-      "-to", String(s.end),
-      "-i", "input.mp4",
+    // видео
+    filter += `[0:v]trim=start=${s.start}:end=${s.end},setpts=PTS-STARTPTS[v${i}];`;
 
-      "-c:v", "copy",   // быстро
-      "-c:a", "aac",    // фикс рассинхрона
-      "-avoid_negative_ts", "1",
+    // аудио
+    filter += `[0:a]atrim=start=${s.start}:end=${s.end},asetpts=PTS-STARTPTS[a${i}];`;
 
-      `part${i}.mp4`
-    );
-  }
+    concatInputs += `[v${i}][a${i}]`;
+  });
+
+  filter += `${concatInputs}concat=n=${segments.length}:v=1:a=1[outv][outa]`;
 
   // =====================
-  // СКЛЕЙКА
+  // ОДИН ПРОГОН FFMPEG
   // =====================
-  setStatus("Склейка...");
-
-  let concatList = "";
-
-  for (let i = 0; i < segments.length; i++) {
-    concatList += `file part${i}.mp4\n`;
-  }
-
-  ffmpeg.FS(
-    "writeFile",
-    "list.txt",
-    new TextEncoder().encode(concatList)
-  );
-
   await ffmpeg.run(
-    "-f", "concat",
-    "-safe", "0",
-    "-i", "list.txt",
-    "-c:v", "copy",
+    "-i", "input.mp4",
+    "-filter_complex", filter,
+    "-map", "[outv]",
+    "-map", "[outa]",
+
+    "-c:v", "libx264",
+    "-preset", "ultrafast", // максимально быстро
     "-c:a", "aac",
+
     "output.mp4"
   );
 
