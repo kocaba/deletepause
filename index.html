@@ -164,13 +164,15 @@
   const durationVal = document.getElementById("durationVal");
   const thresholdVal = document.getElementById("thresholdVal");
 
-  duration.oninput = () => {
-    durationVal.innerText = duration.value + " сек";
-  };
+ duration.addEventListener("input", () => {
+  durationVal.innerText = duration.value + " сек";
+  if (window.audioData) drawWaveform();
+});
 
-  threshold.oninput = () => {
-    thresholdVal.innerText = threshold.value + " dB";
-  };
+threshold.addEventListener("input", () => {
+  thresholdVal.innerText = threshold.value + " dB";
+  if (window.audioData) drawWaveform();
+});
 </script>
 
 </body>
