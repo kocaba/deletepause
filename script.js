@@ -1,181 +1,206 @@
 const { createFFmpeg, fetchFile } = FFmpeg;
 
+// Инициализация с логированием
 const ffmpeg = createFFmpeg({ log: true });
 
 let loaded = false;
-let logs = [];
+let audioData = null;
+let audioDuration = 0;
+let sampleRate = 44100;
+let wakeLock = null;
 
-ffmpeg.setLogger(({ message }) => {
-  logs.push(message);
-});
-
-ffmpeg.setProgress(({ ratio }) => {
-  document.getElementById("progress").innerText =
-    "Processing: " + Math.round(ratio * 100) + "%";
-});
-
-async function loadFFmpeg() {
-  if (!loaded) {
-    await ffmpeg.load();
-    loaded = true;
-  }
-}
-
-// PREVIEW
-document.getElementById("fileInput").onchange = (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  document.getElementById("preview").src =
-    URL.createObjectURL(file);
+// Элементы UI
+const elements = {
+    fileInput: document.getElementById("fileInput"),
+    threshold: document.getElementById("threshold"),
+    duration: document.getElementById("duration"),
+    progress: document.getElementById("progress"),
+    preview: document.getElementById("preview"),
+    downloadBtn: document.getElementById("downloadBtn"),
+    processBtn: document.getElementById("processBtn")
 };
 
-// PARSE SILENCE
-function parseSilence(logs) {
-  const silences = [];
-  let current = null;
+// --- Вспомогательные функции ---
 
-  logs.forEach(line => {
-    const start = line.match(/silence_start: (\d+\.?\d*)/);
-    const end = line.match(/silence_end: (\d+\.?\d*)/);
-
-    if (start) current = { start: parseFloat(start[1]) };
-
-    if (end && current) {
-      current.end = parseFloat(end[1]);
-      silences.push(current);
-      current = null;
+async function enableWakeLock() {
+    if ("wakeLock" in navigator) {
+        try { wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
     }
-  });
-
-  return silences;
 }
 
-// GET DURATION
-function getDuration(logs) {
-  for (const line of logs) {
-    const m = line.match(/Duration: (\d+):(\d+):(\d+\.?\d*)/);
-    if (m) {
-      return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]);
-    }
-  }
-  return 0;
+function setStatus(text) {
+    elements.progress.innerText = text;
 }
 
-// BUILD SEGMENTS
-function buildSegments(silences, duration) {
-  const segments = [];
-  let prev = 0;
-
-  silences.forEach(s => {
-    if (s.start > prev) {
-      segments.push({ start: prev, end: s.start });
+// Прогресс теперь считается точнее
+ffmpeg.setLogger(({ message }) => {
+    console.log(message);
+    const match = message.match(/time=(\d+):(\d+):(\d+\.?\d*)/);
+    if (match && audioDuration) {
+        const currentTime = (+match[1] * 3600) + (+match[2] * 60) + (+match[3]);
+        const percent = Math.min(100, (currentTime / audioDuration) * 100);
+        setStatus(`Обработка: ${percent.toFixed(0)}%`);
     }
-    prev = s.end;
-  });
+});
 
-  if (prev < duration) {
-    segments.push({ start: prev, end: duration });
-  }
+// --- Основная логика ---
 
-  return segments;
+elements.fileInput.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    elements.preview.src = URL.createObjectURL(file);
+    setStatus("Анализ аудио (это быстро)...");
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await file.arrayBuffer();
+    const decoded = await audioCtx.decodeAudioData(arrayBuffer);
+
+    audioData = decoded.getChannelData(0);
+    audioDuration = decoded.duration;
+    sampleRate = decoded.sampleRate;
+
+    drawWaveform();
+    setStatus("Готово к быстрой обработке");
+};
+
+function detectSilencePCM(thresholdDb, minDuration) {
+    const threshold = Math.pow(10, thresholdDb / 20);
+    const windowSize = 2048; // Увеличено для скорости анализа
+    const silences = [];
+    let silenceStart = null;
+
+    for (let i = 0; i < audioData.length; i += windowSize) {
+        let sum = 0;
+        for (let j = 0; j < windowSize; j++) {
+            const sample = audioData[i + j] || 0;
+            sum += sample * sample;
+        }
+        const rms = Math.sqrt(sum / windowSize);
+        const time = i / sampleRate;
+
+        if (rms < threshold) {
+            if (silenceStart === null) silenceStart = time;
+        } else {
+            if (silenceStart !== null) {
+                if ((time - silenceStart) >= minDuration) {
+                    silences.push({ start: silenceStart, end: time });
+                }
+                silenceStart = null;
+            }
+        }
+    }
+    return silences;
 }
 
-// MAIN
-document.getElementById("processBtn").onclick = async () => {
-  const file = document.getElementById("fileInput").files[0];
+function drawWaveform() {
+    const canvas = document.getElementById("waveform");
+    const ctx = canvas.getContext("2d");
+    const width = canvas.width = canvas.offsetWidth;
+    const height = canvas.height = canvas.offsetHeight;
 
-  if (!file) return alert("Выбери файл");
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = "#2b6cff";
 
-  await loadFFmpeg();
+    const step = Math.ceil(audioData.length / width);
+    const amp = height / 2;
 
-  logs = [];
+    for (let i = 0; i < width; i++) {
+        let min = 1, max = -1;
+        for (let j = 0; j < step; j++) {
+            const val = audioData[(i * step) + j] || 0;
+            if (val < min) min = val;
+            if (val > max) max = val;
+        }
+        ctx.fillRect(i, (1 + min) * amp, 1, Math.max(1, (max - min) * amp));
+    }
 
-  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
+    // Подсветка тишины
+    const silences = detectSilencePCM(parseFloat(elements.threshold.value), parseFloat(elements.duration.value));
+    ctx.fillStyle = "rgba(255, 0, 0, 0.4)";
+    silences.forEach(s => {
+        const x1 = (s.start / audioDuration) * width;
+        const x2 = (s.end / audioDuration) * width;
+        ctx.fillRect(x1, 0, x2 - x1, height);
+    });
+}
 
-  const duration = document.getElementById("duration").value;
-  const threshold = document.getElementById("threshold").value;
+// Слушатели ползунков
+elements.threshold.oninput = () => { if(audioData) drawWaveform(); };
+elements.duration.oninput = () => { if(audioData) drawWaveform(); };
 
-  // 1. DETECT
-  await ffmpeg.run(
-    "-i", "input.mp4",
-    "-af", `silencedetect=noise=${threshold}dB:d=${duration}`,
-    "-f", "null",
-    "-"
-  );
+// ГЛАВНЫЙ ПРОЦЕСС
+elements.processBtn.onclick = async () => {
+    const file = elements.fileInput.files[0];
+    if (!file || !audioData) return alert("Сначала выберите файл");
 
-  const silences = parseSilence(logs);
+    if (!loaded) {
+        setStatus("Загрузка FFmpeg (один раз)...");
+        await ffmpeg.load();
+        loaded = true;
+    }
 
-  if (!silences.length) {
-    alert("Тишина не найдена");
-    return;
-  }
+    await enableWakeLock();
+    
+    const threshold = parseFloat(elements.threshold.value);
+    const minDur = parseFloat(elements.duration.value);
+    const silences = detectSilencePCM(threshold, minDur);
+    
+    // Создаем сегменты "со звуком"
+    let lastPos = 0;
+    const segments = [];
+    const PAD = 0.1; // Небольшой отступ, чтобы не резать слова
 
-  const totalDuration = getDuration(logs);
+    silences.forEach(s => {
+        if (s.start - lastPos > 0.1) {
+            segments.push({ start: lastPos, end: s.start });
+        }
+        lastPos = s.end;
+    });
+    if (audioDuration - lastPos > 0.1) {
+        segments.push({ start: lastPos, end: audioDuration });
+    }
 
-  let segments = buildSegments(silences, totalDuration);
+    setStatus(`Склеиваем ${segments.length} фрагментов...`);
 
-  // padding
-  const PAD = 0.08;
+    ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
-  segments = segments.map(s => ({
-    start: Math.max(0, s.start - PAD),
-    end: s.end + PAD
-  }));
+    // ОПТИМИЗИРОВАННЫЙ ФИЛЬТР
+    // Чтобы было БЫСТРО, мы принудительно снижаем разрешение до 720p (опционально)
+    // и используем пресет ultrafast.
+    let filter = "";
+    let inputs = "";
+    segments.forEach((s, i) => {
+        const start = Math.max(0, s.start - PAD).toFixed(3);
+        const end = Math.min(audioDuration, s.end + PAD).toFixed(3);
+        
+        filter += `[0:v]trim=start=${start}:end=${end},setpts=PTS-STARTPTS[v${i}];`;
+        filter += `[0:a]atrim=start=${start}:end=${end},asetpts=PTS-STARTPTS[a${i}];`;
+        inputs += `[v${i}][a${i}]`;
+    });
 
-  // =====================
-  // CUT FILES
-  // =====================
-  for (let i = 0; i < segments.length; i++) {
-    const s = segments[i];
+    filter += `${inputs}concat=n=${segments.length}:v=1:a=1[outv][outa]`;
 
     await ffmpeg.run(
-      "-ss", String(s.start),
-      "-to", String(s.end),
-      "-i", "input.mp4",
-      "-c:v", "libx264",
-      "-c:a", "aac",
-      `part${i}.mp4`
+        "-i", "input.mp4",
+        "-filter_complex", filter,
+        "-map", "[outv]",
+        "-map", "[outa]",
+        "-c:v", "libx264",
+        "-preset", "ultrafast", // Максимальная скорость
+        "-crf", "28",           // Оптимальный баланс качества/скорости
+        "-threads", "4",        // Попытка использовать многопоточность
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "output.mp4"
     );
-  }
 
-  // =====================
-  // CONCAT LIST
-  // =====================
-  let concatList = "";
+    const data = ffmpeg.FS("readFile", "output.mp4");
+    const url = URL.createObjectURL(new Blob([data.buffer], { type: "video/mp4" }));
 
-  for (let i = 0; i < segments.length; i++) {
-    concatList += `file part${i}.mp4\n`;
-  }
-
-  ffmpeg.FS(
-    "writeFile",
-    "list.txt",
-    new TextEncoder().encode(concatList)
-  );
-
-  // =====================
-  // MERGE
-  // =====================
-  await ffmpeg.run(
-    "-f", "concat",
-    "-safe", "0",
-    "-i", "list.txt",
-    "-c:v", "libx264",
-    "-c:a", "aac",
-    "output.mp4"
-  );
-
-  // RESULT
-  const data = ffmpeg.FS("readFile", "output.mp4");
-
-  const url = URL.createObjectURL(
-    new Blob([data.buffer], { type: "video/mp4" })
-  );
-
-  document.getElementById("preview").src = url;
-
-  const btn = document.getElementById("downloadBtn");
-  btn.href = url;
-  btn.style.display = "inline";
+    elements.preview.src = url;
+    elements.downloadBtn.href = url;
+    elements.downloadBtn.style.display = "block";
+    setStatus("Готово!");
+    if (wakeLock) wakeLock.release();
 };
