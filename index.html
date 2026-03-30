@@ -166,12 +166,10 @@
 
  duration.addEventListener("input", () => {
   durationVal.innerText = duration.value + " сек";
-  if (window.audioData) drawWaveform();
 });
 
 threshold.addEventListener("input", () => {
   thresholdVal.innerText = threshold.value + " dB";
-  if (window.audioData) drawWaveform();
 });
 </script>
 
