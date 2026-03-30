@@ -48,7 +48,7 @@ async function loadAudioData(file) {
 
 
 // =========================
-// DETECT SILENCE (точнее)
+// DETECT SILENCE (точный)
 // =========================
 function detectSilencePCM(thresholdDb, minDuration) {
 
@@ -111,7 +111,7 @@ function buildSegments(silences, duration) {
 
 
 // =========================
-// MAIN PROCESS (ИДЕАЛ)
+// MAIN PROCESS (СТАБИЛЬНЫЙ)
 // =========================
 document.getElementById("processBtn").onclick = async () => {
 
@@ -134,41 +134,39 @@ document.getElementById("processBtn").onclick = async () => {
 
   const segments = buildSegments(silences, audioDuration);
 
-  setStatus("Обработка...");
-
   ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
-  // =====================
-  // СОЗДАЁМ FILTER
-  // =====================
+  setStatus("Обработка...");
 
   let filter = "";
   let concatInputs = "";
 
   segments.forEach((s, i) => {
 
-    // видео
-    filter += `[0:v]trim=start=${s.start}:end=${s.end},setpts=PTS-STARTPTS[v${i}];`;
+    // ВИДЕО (фикс fps и pts)
+    filter += `[0:v]trim=start=${s.start}:end=${s.end},setpts=PTS-STARTPTS,fps=30[v${i}];`;
 
-    // аудио
-    filter += `[0:a]atrim=start=${s.start}:end=${s.end},asetpts=PTS-STARTPTS[a${i}];`;
+    // АУДИО (фикс sync)
+    filter += `[0:a]atrim=start=${s.start}:end=${s.end},asetpts=PTS-STARTPTS,aresample=async=1[a${i}];`;
 
     concatInputs += `[v${i}][a${i}]`;
   });
 
   filter += `${concatInputs}concat=n=${segments.length}:v=1:a=1[outv][outa]`;
 
-  // =====================
-  // ОДИН ПРОГОН FFMPEG
-  // =====================
   await ffmpeg.run(
+    "-fflags", "+genpts",
     "-i", "input.mp4",
+
     "-filter_complex", filter,
     "-map", "[outv]",
     "-map", "[outa]",
 
+    "-vsync", "2",
+    "-avoid_negative_ts", "make_zero",
+
     "-c:v", "libx264",
-    "-preset", "ultrafast", // максимально быстро
+    "-preset", "ultrafast",
     "-c:a", "aac",
 
     "output.mp4"
