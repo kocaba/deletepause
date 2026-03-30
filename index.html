@@ -3,135 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pause Remover Pro - WebProgger</title>
+    <title>Pause Remover Pro</title>
     <style>
         :root { --p-clr: #2b6cff; --s-clr: #00b894; --b-clr: #050505; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { 
             margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
             background: var(--b-clr); color: #fff; min-height: 100vh;
-            display: flex; flex-direction: column; align-items: center;
-            padding-top: 100px; overflow-x: hidden;
+            display: flex; flex-direction: column; align-items: center; padding-top: 80px;
         }
-
-        /* АНІМАЦІЯ ФОНУ */
-        .bg_anim { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background: #000; }
-        .blob {
-            position: absolute; width: 500px; height: 500px;
-            background: radial-gradient(circle, rgba(43,108,255,0.2) 0%, rgba(0,0,0,0) 70%);
-            border-radius: 50%; filter: blur(60px); animation: move 10s infinite alternate ease-in-out;
-        }
-        @keyframes move { 0% { transform: translate(-10%, -10%); } 100% { transform: translate(30%, 20%); } }
-
-        /* ХЕДЕР */
-        header .f_head {
-            width: 100%; height: 70px; position: fixed; top: 0; left: 0; z-index: 100;
+        .f_head {
+            width: 100%; height: 60px; position: fixed; top: 0; left: 0; z-index: 100;
             background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
             display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #ddd;
         }
-        .logo_txt { color: #000; font-weight: bold; font-size: 20px; text-decoration: none; }
-        .logo_txt span { color: darkblue; }
-
-        .main_app_v3 { width: 100%; max-width: 500px; padding: 0 15px; z-index: 10; }
-        
-        .card_main { 
-            background: #fff; border-radius: 24px; padding: 25px; 
-            margin-bottom: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); color: #333;
+        .logo { color: #000; font-weight: bold; text-decoration: none; font-size: 18px; }
+        .main_app { width: 100%; max-width: 450px; padding: 0 15px; }
+        .card { 
+            background: #fff; border-radius: 20px; padding: 20px; 
+            margin-bottom: 20px; color: #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
-        h2 { text-align: center; margin-top: 0; color: var(--p-clr); font-size: 22px; }
-        
-        .f_inp_88 { 
-            width: 100%; padding: 40px 10px; border: 2px dashed #ccc; border-radius: 16px; 
-            background: #f9f9f9; text-align: center; cursor: pointer; color: #777; font-weight: 600;
+        .btn_file { 
+            width: 100%; padding: 40px 10px; border: 2px dashed #ccc; border-radius: 15px; 
+            background: #f9f9f9; text-align: center; cursor: pointer; color: #666; font-weight: bold;
         }
-
-        /* PROGRESS OVERLAY */
-        #ov_scr_55 {
+        #ov_loading {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.95); z-index: 9999; flex-direction: column;
-            justify-content: center; align-items: center; color: white;
+            background: rgba(0,0,0,0.9); z-index: 9999; flex-direction: column;
+            justify-content: center; align-items: center;
         }
-        .p_bar_bg { width: 80%; height: 8px; background: #333; border-radius: 4px; margin: 20px 0; overflow: hidden; }
-        #p_bar_fill { width: 0%; height: 100%; background: var(--p-clr); transition: width 0.3s; }
-        
-        /* CONTROLS */
-        .tabs_row { display: flex; background: #eee; border-radius: 12px; padding: 4px; margin-bottom: 15px; }
-        .tab_btn { flex: 1; text-align: center; padding: 10px; cursor: pointer; border-radius: 10px; font-size: 14px; font-weight: bold; color: #666; }
-        .active_t { background: var(--p-clr); color: white; }
-        
-        .btn_prim { 
-            width: 100%; padding: 16px; border: none; border-radius: 14px; 
-            background: var(--p-clr); color: white; font-size: 16px; font-weight: bold; cursor: pointer;
-        }
-        
-        #wv_cvs_11 { width: 100%; height: 100px; background: #fafafa; border-radius: 10px; border: 1px solid #eee; margin: 10px 0; }
-        .info_box { font-size: 13px; color: #666; background: #f0f7ff; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
-        input[type=range] { width: 100%; margin: 10px 0; }
-        .hidden_node { display: none !important; }
-        video { width: 100%; border-radius: 12px; }
+        .p_bar { width: 250px; height: 6px; background: #333; border-radius: 3px; margin: 15px 0; overflow: hidden; }
+        #p_fill { width: 0%; height: 100%; background: var(--p-clr); transition: width 0.2s; }
+        .tabs { display: flex; background: #eee; border-radius: 10px; padding: 4px; margin-bottom: 15px; }
+        .tab { flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px; font-size: 13px; font-weight: bold; }
+        .active { background: var(--p-clr); color: white; }
+        canvas { width: 100%; height: 80px; background: #fdfdfd; border-radius: 8px; border: 1px solid #eee; margin: 10px 0; }
+        .btn_go { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--p-clr); color: white; font-weight: bold; font-size: 16px; }
+        video { width: 100%; border-radius: 10px; margin-top: 10px; background: #000; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-<div class="bg_anim"><div class="blob"></div></div>
+<header class="f_head"><a href="#" class="logo">PauseRemover<span>AI</span></a></header>
 
-<header>
-    <div class="f_head">
-        <a href="#" class="logo_txt">Web<span>Progger</span></a>
-    </div>
-</header>
-
-<div id="ov_scr_55">
-    <div id="ov_pct" style="font-size: 48px; font-weight: 900; color: var(--p-clr);">0%</div>
-    <div id="ov_title">Обробка відео...</div>
-    <div class="p_bar_bg"><div id="p_bar_fill"></div></div>
-    <div style="font-size:12px; opacity:0.5">Не згортайте браузер</div>
+<div id="ov_loading">
+    <div id="ov_pct" style="font-size: 40px; font-weight: 800;">0%</div>
+    <div id="ov_msg" style="font-size: 14px; margin-top: 10px;">Обробка...</div>
+    <div class="p_bar"><div id="p_fill"></div></div>
 </div>
 
-<div class="main_app_v3">
-    <div id="step_file" class="card_main">
-        <h2>Pause Remover Pro</h2>
-        <div class="f_inp_88" onclick="document.getElementById('real_f').click()">
-            <div style="font-size:30px;">🎬</div>
-            Оберіть відео для обробки
-            <input type="file" id="real_f" accept="video/*" style="display:none">
+<div class="main_app">
+    <div id="step1" class="card">
+        <h2 style="margin-top:0; text-align:center; color:var(--p-clr)">Завантажте відео</h2>
+        <div class="btn_file" onclick="document.getElementById('fin').click()">
+            <span style="font-size:30px">📁</span><br>Натисніть для вибору
+            <input type="file" id="fin" accept="video/*" style="display:none">
         </div>
-        <p style="font-size: 12px; color: #999; text-align: center; margin-top: 15px;">
-            Всі обчислення проходять прямо на вашому телефоні.
-        </p>
     </div>
 
-    <div id="step_editor" class="card_main hidden_node">
-        <div class="tabs_row">
-            <div id="t_auto" class="tab_btn active_t">Авто</div>
-            <div id="t_manual" class="tab_btn">Ручне</div>
+    <div id="step2" class="card hidden">
+        <div class="tabs">
+            <div id="t_a" class="tab active">Авто</div>
+            <div id="t_m" class="tab">Ручне</div>
         </div>
-
-        <div id="m_cntrls" class="hidden_node">
-            <label style="font-size:12px; font-weight:bold;">Довжина пауз (сек)</label>
-            <input type="range" id="val_dur" min="0.1" max="1.5" step="0.05" value="0.4">
-            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:10px;">
-                <span>Більше склейок</span><span id="txt_dur">0.4 сек</span>
-            </div>
-
-            <label style="font-size:12px; font-weight:bold;">Поріг шуму (dB)</label>
-            <input type="range" id="val_db" min="-50" max="-20" step="1" value="-35">
-            <div style="display:flex;justify-content:space-between;font-size:11px;">
-                <span>Тихіше</span><span id="txt_db">-35 dB</span>
+        <div id="m_ui" class="hidden">
+            <input type="range" id="r_db" min="-50" max="-20" value="-35" style="width:100%">
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:10px">
+                <span>Чутливість</span><span id="v_db">-35 dB</span>
             </div>
         </div>
-
-        <div id="a_info" class="info_box">✨ Штучний інтелект підібрав оптимальні параметри для вашого відео.</div>
-        
-        <canvas id="wv_cvs_11"></canvas>
-        <button id="go_proc" class="btn_prim">Вирізати всі паузи</button>
+        <canvas id="cvs"></canvas>
+        <button id="run" class="btn_go">Почати монтаж</button>
     </div>
 
-    <div id="step_result" class="card_main hidden_node">
-        <h2>Готово!</h2>
-        <video id="vid_pre_77" controls></video>
-        <a id="dl_btn_99" download="result.mp4" class="btn_prim" style="display:block; text-decoration:none; background:var(--s-clr); text-align:center; margin: 15px 0;">Завантажити у галерею</a>
-        <button class="btn_prim" style="background:#eee; color:#333;" onclick="location.reload()">Обробити ще одне</button>
+    <div id="step3" class="card hidden">
+        <video id="v_res" controls></video>
+        <a id="btn_dl" download="result.mp4" class="btn_go" style="display:block; text-decoration:none; text-align:center; margin-top:15px; background:var(--s-clr)">Зберегти відео</a>
+        <button onclick="location.reload()" style="width:100%; margin-top:10px; border:none; background:none; color:#666">Інше відео</button>
     </div>
 </div>
 
