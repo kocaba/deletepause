@@ -3,44 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pause Remover Pro</title>
+    <title>AI Silence Remover</title>
     <style>
-        :root { --p-clr: #2b6cff; --b-clr: #050505; }
-        body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--b-clr); color: #fff; text-align: center; padding: 20px; }
-        .card { background: #fff; border-radius: 20px; padding: 25px; color: #333; max-width: 400px; margin: 20px auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .btn_file { padding: 40px 10px; border: 2px dashed #ccc; border-radius: 15px; background: #f9f9f9; cursor: pointer; color: #666; font-weight: bold; }
-        #ov { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; flex-direction:column; justify-content:center; align-items:center; }
-        #debug_log { background: #222; color: #ff4d4d; padding: 10px; border-radius: 8px; margin-top: 20px; font-family: monospace; font-size: 12px; text-align: left; overflow-x: auto; display: none; }
-        .hidden { display: none !important; }
-        canvas { width: 100%; height: 80px; background: #eee; border-radius: 10px; margin: 15px 0; }
-        .btn_go { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--p-clr); color: white; font-weight: bold; font-size: 16px; cursor: pointer; }
+        :root { --accent: #007aff; --bg: #000; --card: #1c1c1e; }
+        body { margin: 0; font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: #fff; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .container { width: 100%; max-width: 500px; padding: 20px; box-sizing: border-box; }
+        .card { background: var(--card); border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        h1 { font-size: 22px; text-align: center; margin-bottom: 25px; color: var(--accent); }
+        .upload-area { border: 2px dashed #3a3a3c; border-radius: 12px; padding: 40px 10px; text-align: center; cursor: pointer; transition: 0.3s; }
+        .upload-area:active { background: #2c2c2e; }
+        .btn { width: 100%; background: var(--accent); border: none; border-radius: 10px; padding: 15px; color: white; font-weight: 600; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        .btn:disabled { background: #3a3a3c; color: #8e8e93; }
+        #status-log { margin-top: 15px; font-size: 12px; color: #ff453a; font-family: monospace; white-space: pre-wrap; text-align: left; }
+        #ov-loading { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; flex-direction: column; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        canvas { width: 100%; height: 80px; background: #2c2c2e; border-radius: 8px; margin: 15px 0; }
+        .hidden { display: none; }
+        video { width: 100%; border-radius: 12px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-<div id="ov">
-    <div id="msg">Завантаження...</div>
-    <div id="pct" style="font-size: 40px; font-weight: 800;">0%</div>
+<div id="ov-loading">
+    <div id="loader-pct" style="font-size: 48px; font-weight: bold;">0%</div>
+    <div id="loader-msg" style="margin-top: 10px; color: #8e8e93;">Обробка...</div>
 </div>
 
-<div id="step1" class="card">
-    <h2 style="margin-top:0">Крок 1: Відео</h2>
-    <div class="btn_file" onclick="document.getElementById('fin').click()">
-        📁 Натисніть для вибору файлу
-        <input type="file" id="fin" accept="video/*" style="display:none">
+<div class="container">
+    <h1>Silence Remover AI</h1>
+
+    <div id="step-1" class="card">
+        <div class="upload-area" id="drop-zone">
+            <span style="font-size: 40px;">🎬</span>
+            <p>Натисніть, щоб обрати відео</p>
+            <input type="file" id="file-input" accept="video/*" style="display: none;">
+        </div>
+        <div id="status-log"></div>
     </div>
-    <div id="debug_log"></div>
-</div>
 
-<div id="step2" class="card hidden">
-    <h2 style="margin-top:0">Крок 2: Налаштування</h2>
-    <canvas id="cvs"></canvas>
-    <button id="run" class="btn_go">Вирізати паузи</button>
-</div>
+    <div id="step-2" class="card hidden">
+        <p style="margin: 0; font-size: 14px; color: #8e8e93;">Аудіограма:</p>
+        <canvas id="wav-canvas"></canvas>
+        <button id="process-btn" class="btn">Видалити тишу</button>
+    </div>
 
-<div id="step3" class="card hidden">
-    <video id="v_res" controls style="width:100%; border-radius:10px;"></video>
-    <button class="btn_go" style="margin-top:10px; background:#444" onclick="location.reload()">Почати заново</button>
+    <div id="step-3" class="card hidden">
+        <video id="result-video" controls></video>
+        <button id="save-btn" class="btn" style="background: #32d74b;">Зберегти результат</button>
+        <button onclick="location.reload()" class="btn" style="background: transparent; color: #8e8e93;">Інше відео</button>
+    </div>
 </div>
 
 <script src="./ffmpeg/ffmpeg.min.js"></script>
