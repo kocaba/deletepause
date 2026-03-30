@@ -37,7 +37,7 @@ async function loadFFmpeg() {
 
 
 // =========================
-// LOAD AUDIO (быстро)
+// LOAD AUDIO
 // =========================
 async function loadAudioData(file) {
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -58,8 +58,6 @@ async function loadAudioData(file) {
 function detectSilencePCM(thresholdDb, minDuration) {
 
   const threshold = Math.pow(10, thresholdDb / 20);
-
-  // 🔥 увеличили окно = быстрее
   const windowSize = 4096;
 
   const silences = [];
@@ -69,7 +67,6 @@ function detectSilencePCM(thresholdDb, minDuration) {
 
     let sum = 0;
 
-    // 🔥 быстрее чем RMS
     for (let j = 0; j < windowSize; j++) {
       const sample = audioData[i + j] || 0;
       sum += Math.abs(sample);
@@ -160,7 +157,6 @@ function drawWaveform() {
     );
   }
 
-  // подсветка тишины
   const threshold = parseFloat(document.getElementById("threshold").value);
   const duration = parseFloat(document.getElementById("duration").value);
 
@@ -209,7 +205,7 @@ document.getElementById("duration").oninput = () => {
 
 
 // =========================
-// MAIN PROCESS (УЛЬТРА БЫСТРО)
+// MAIN PROCESS (ФИКС РАССИНХРОНА)
 // =========================
 document.getElementById("processBtn").onclick = async () => {
 
@@ -223,7 +219,6 @@ document.getElementById("processBtn").onclick = async () => {
   const threshold = parseFloat(document.getElementById("threshold").value);
   const duration = parseFloat(document.getElementById("duration").value);
 
-  // 🔥 используем JS вместо ffmpeg
   const silences = detectSilencePCM(threshold, duration);
 
   if (!silences.length) {
@@ -235,13 +230,11 @@ document.getElementById("processBtn").onclick = async () => {
 
   setStatus(`Сегментов: ${segments.length}`);
 
-  // =====================
-  // ЗАГРУЗКА В FFmpeg
-  // =====================
+  // загрузка файла
   ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
   // =====================
-  // РЕЗКА (БЕЗ ПЕРЕКОДА)
+  // РЕЗКА (FIX)
   // =====================
   for (let i = 0; i < segments.length; i++) {
 
@@ -253,7 +246,11 @@ document.getElementById("processBtn").onclick = async () => {
       "-ss", String(s.start),
       "-to", String(s.end),
       "-i", "input.mp4",
-      "-c", "copy", // 🔥 СУПЕР БЫСТРО
+
+      "-c:v", "copy",   // быстро
+      "-c:a", "aac",    // фикс рассинхрона
+      "-avoid_negative_ts", "1",
+
       `part${i}.mp4`
     );
   }
@@ -279,7 +276,8 @@ document.getElementById("processBtn").onclick = async () => {
     "-f", "concat",
     "-safe", "0",
     "-i", "list.txt",
-    "-c", "copy",
+    "-c:v", "copy",
+    "-c:a", "aac",
     "output.mp4"
   );
 
