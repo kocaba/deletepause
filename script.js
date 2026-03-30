@@ -8,19 +8,30 @@ const ffmpeg = createFFmpeg({ log: true });
 let loaded = false;
 let logs = [];
 
-// Удобная функция для статуса
+// =========================
+// STATE (новое)
+// =========================
+let audioData = null;
+let audioDuration = 0;
+let sampleRate = 44100;
+
+// =========================
+// STATUS
+// =========================
 function setStatus(text) {
   document.getElementById("progress").innerText = text;
 }
 
-// Логи ffmpeg (для silencedetect)
+// =========================
+// LOGGER
+// =========================
 ffmpeg.setLogger(({ message }) => {
   logs.push(message);
 });
 
-// ⚠️ ОТКЛЮЧАЕМ стандартный ratio (он тебе больше не нужен)
-// ffmpeg.setProgress — больше не используем
-
+// =========================
+// LOAD FFMPEG
+// =========================
 async function loadFFmpeg() {
   if (!loaded) {
     setStatus("Загрузка движка...");
@@ -30,36 +41,90 @@ async function loadFFmpeg() {
 }
 
 // =========================
-// WAVEFORM (БЕЗ FFMPEG)
+// LOAD AUDIO (ВАЖНО)
 // =========================
-async function drawWaveform(file) {
+async function loadAudioData(file) {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  await audioCtx.resume();
+
+  const buffer = await file.arrayBuffer();
+  const decoded = await audioCtx.decodeAudioData(buffer);
+
+  audioData = decoded.getChannelData(0);
+  audioDuration = decoded.duration;
+  sampleRate = decoded.sampleRate;
+}
+
+// =========================
+// DETECT SILENCE (БЫСТРО)
+// =========================
+function detectSilencePCM(thresholdDb, minDuration) {
+  const threshold = Math.pow(10, thresholdDb / 20);
+
+  const windowSize = 1024;
+  const silences = [];
+
+  let silenceStart = null;
+
+  for (let i = 0; i < audioData.length; i += windowSize) {
+    let sum = 0;
+
+    for (let j = 0; j < windowSize; j++) {
+      const sample = audioData[i + j] || 0;
+      sum += sample * sample;
+    }
+
+    const rms = Math.sqrt(sum / windowSize);
+    const time = i / sampleRate;
+
+    if (rms < threshold) {
+      if (silenceStart === null) silenceStart = time;
+    } else {
+      if (silenceStart !== null) {
+        const dur = time - silenceStart;
+
+        if (dur >= minDuration) {
+          silences.push({ start: silenceStart, end: time });
+        }
+
+        silenceStart = null;
+      }
+    }
+  }
+
+  return silences;
+}
+
+// =========================
+// DRAW WAVEFORM + SILENCE
+// =========================
+function drawWaveform() {
   const canvas = document.getElementById("waveform");
   const ctx = canvas.getContext("2d");
 
-  const audioCtx = new AudioContext();
+  // адаптив
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
 
-  // читаем файл как ArrayBuffer
-  const arrayBuffer = await file.arrayBuffer();
+  const width = canvas.width;
+  const height = canvas.height;
 
-  // декодируем аудио
-  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  const step = Math.ceil(audioData.length / width);
+  const amp = height / 2;
 
-  const data = audioBuffer.getChannelData(0); // один канал
-  const step = Math.ceil(data.length / canvas.width);
+  ctx.clearRect(0, 0, width, height);
 
-  const amp = canvas.height / 2;
+  // waveform
+  ctx.fillStyle = "#888";
 
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // рисуем waveform
-  for (let i = 0; i < canvas.width; i++) {
-    let min = 1.0;
-    let max = -1.0;
+  for (let i = 0; i < width; i++) {
+    let min = 1;
+    let max = -1;
 
     for (let j = 0; j < step; j++) {
-      const datum = data[(i * step) + j];
-      if (datum < min) min = datum;
-      if (datum > max) max = datum;
+      const val = audioData[(i * step) + j] || 0;
+      if (val < min) min = val;
+      if (val > max) max = val;
     }
 
     ctx.fillRect(
@@ -69,27 +134,62 @@ async function drawWaveform(file) {
       Math.max(1, (max - min) * amp)
     );
   }
+
+  // берём параметры
+  const threshold = parseFloat(document.getElementById("threshold").value);
+  const duration = parseFloat(document.getElementById("duration").value);
+
+  const silences = detectSilencePCM(threshold, duration);
+
+  // красная подсветка
+  ctx.fillStyle = "rgba(255,0,0,0.3)";
+
+  silences.forEach(s => {
+    const x1 = (s.start / audioDuration) * width;
+    const x2 = (s.end / audioDuration) * width;
+
+    ctx.fillRect(x1, 0, x2 - x1, height);
+  });
 }
 
 // =========================
-// PREVIEW + WAVEFORM
+// FILE LOAD
 // =========================
 document.getElementById("fileInput").onchange = async (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
-  // видео preview
   document.getElementById("preview").src =
     URL.createObjectURL(file);
 
-  // waveform
   setStatus("Анализ аудио...");
-  await drawWaveform(file);
+
+  await loadAudioData(file);
+  drawWaveform();
+
   setStatus("Готово к обработке");
 };
 
 // =========================
-// PARSE SILENCE
+// LIVE UPDATE
+// =========================
+document.getElementById("threshold").oninput = () => {
+  if (audioData) drawWaveform();
+};
+
+document.getElementById("duration").oninput = () => {
+  if (audioData) drawWaveform();
+};
+
+// =========================
+// RESIZE
+// =========================
+window.addEventListener("resize", () => {
+  if (audioData) drawWaveform();
+});
+
+// =========================
+// PARSE SILENCE (FFMPEG)
 // =========================
 function parseSilence(logs) {
   const silences = [];
@@ -162,9 +262,6 @@ document.getElementById("processBtn").onclick = async () => {
   const duration = document.getElementById("duration").value;
   const threshold = document.getElementById("threshold").value;
 
-  // =========================
-  // 1. DETECT SILENCE
-  // =========================
   setStatus("Поиск тишины...");
 
   await ffmpeg.run(
@@ -185,7 +282,6 @@ document.getElementById("processBtn").onclick = async () => {
 
   let segments = buildSegments(silences, totalDuration);
 
-  // padding
   const PAD = 0.08;
 
   segments = segments.map(s => ({
@@ -195,13 +291,10 @@ document.getElementById("processBtn").onclick = async () => {
 
   setStatus(`Найдено сегментов: ${segments.length}`);
 
-  // =========================
-  // CUT
-  // =========================
   for (let i = 0; i < segments.length; i++) {
     const s = segments[i];
 
-    setStatus(`Обработка сегмента ${i + 1} из ${segments.length}`);
+    setStatus(`Сегмент ${i + 1} / ${segments.length}`);
 
     await ffmpeg.run(
       "-ss", String(s.start),
@@ -213,10 +306,7 @@ document.getElementById("processBtn").onclick = async () => {
     );
   }
 
-  // =========================
-  // CONCAT LIST
-  // =========================
-  setStatus("Подготовка склейки...");
+  setStatus("Склейка...");
 
   let concatList = "";
 
@@ -230,11 +320,6 @@ document.getElementById("processBtn").onclick = async () => {
     new TextEncoder().encode(concatList)
   );
 
-  // =========================
-  // MERGE
-  // =========================
-  setStatus("Склейка сегментов...");
-
   await ffmpeg.run(
     "-f", "concat",
     "-safe", "0",
@@ -244,9 +329,6 @@ document.getElementById("processBtn").onclick = async () => {
     "output.mp4"
   );
 
-  // =========================
-  // RESULT
-  // =========================
   setStatus("Готово");
 
   const data = ffmpeg.FS("readFile", "output.mp4");
