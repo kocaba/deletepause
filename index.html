@@ -1,214 +1,80 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pause Remover Pro — Розумний відеоредактор</title>
+  <title>Pause Remover Pro</title>
   <style>
-    :root {
-      --primary: #2b6cff;
-      --accent: #00d2ff;
-      --success: #00b894;
-      --glass: rgba(255, 255, 255, 0.1);
-      --card-bg: rgba(255, 255, 255, 0.95);
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: #000;
-      color: #333;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      overflow-x: hidden;
-      position: relative;
-    }
-
-    /* Анімація плаваючого синього круга на фоні */
-    .bg-animation {
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      z-index: -1;
-      overflow: hidden;
-    }
-
-    .blob {
-      position: absolute;
-      width: 500px;
-      height: 500px;
-      background: radial-gradient(circle, #1e3a8a 0%, rgba(0,0,0,0) 70%);
-      border-radius: 50%;
-      filter: blur(60px);
-      animation: move 12s infinite alternate ease-in-out;
-    }
-
-    @keyframes move {
-      from { transform: translate(-10%, 20%); }
-      to { transform: translate(110%, 70%); }
-    }
-
-    .app { width: 100%; max-width: 600px; padding: 20px; z-index: 1; }
-
-    .card { 
-      background: var(--card-bg); 
-      border-radius: 24px; 
-      padding: 30px; 
-      margin-bottom: 20px; 
-      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-      border: 1px solid rgba(255,255,255,0.2);
-    }
-
-    h1, h2 { text-align: center; margin-top: 0; color: var(--primary); }
-    .intro-text { text-align: center; font-size: 14px; color: #555; margin-bottom: 20px; line-height: 1.5; }
-
-    /* Поле завантаження */
-    .upload-zone {
-      border: 2px dashed #cbd5e1;
-      border-radius: 16px;
-      padding: 40px 20px;
-      text-align: center;
-      cursor: pointer;
-      transition: 0.3s;
-    }
-    .upload-zone:hover { border-color: var(--primary); background: #f0f7ff; }
-
-    /* Налаштування */
-    .tabs { display: flex; background: #eee; border-radius: 12px; padding: 4px; margin-bottom: 20px; }
-    .tabs div { flex: 1; text-align: center; padding: 10px; cursor: pointer; border-radius: 10px; transition: 0.3s; font-weight: bold; }
-    .active-tab { background: var(--primary); color: white; }
-
-    label { font-size: 14px; font-weight: bold; display: block; margin-top: 15px; }
-    input[type="range"] { width: 100%; cursor: pointer; accent-color: var(--primary); }
-
-    /* Аудіо та Відео */
-    #waveform { width: 100%; height: 100px; background: #000; border-radius: 12px; margin: 15px 0; }
+    :root { --primary: #2b6cff; --success: #00b894; --bg: #f5f9ff; }
+    body { margin: 0; font-family: -apple-system, sans-serif; background: var(--bg); display: flex; justify-content: center; color: #333; }
+    .app { width: 100%; max-width: 600px; padding: 20px; }
+    .card { background: white; border-radius: 16px; padding: 20px; margin-bottom: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+    h2 { text-align: center; margin-top: 0; color: var(--primary); }
+    input[type="file"] { width: 100%; padding: 10px; border: 1px dashed #ccc; border-radius: 10px; cursor: pointer; box-sizing: border-box; }
+    label { font-size: 14px; margin-top: 15px; display: block; font-weight: bold; }
+    .slider-info { display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-top: 4px; }
+    input[type="range"] { width: 100%; margin-top: 8px; cursor: pointer; }
     
-    .video-container { text-align: center; margin: 15px 0; }
-    video { 
-      width: 40%; /* Твоя вимога: 40% ширини */
-      border-radius: 12px; 
-      background: #000; 
-      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-    }
-
-    /* Прогрес */
+    /* Progress Bar Styles */
     .progress-container { margin: 20px 0; display: none; }
-    .progress-bg { width: 100%; background: #ddd; height: 10px; border-radius: 5px; overflow: hidden; }
-    #progressBar { width: 0%; height: 100%; background: var(--primary); transition: width 0.3s; }
+    .progress-bg { width: 100%; background: #eee; height: 12px; border-radius: 6px; overflow: hidden; }
+    #progressBar { width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease; }
+    #statusText { text-align: center; font-weight: bold; margin-bottom: 5px; font-size: 15px; }
+    #etaText { text-align: center; font-size: 12px; color: #888; margin-top: 5px; }
 
-    /* Кнопки */
-    .btn { 
-      width: 100%; padding: 16px; border: none; border-radius: 14px; 
-      font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; 
-    }
-    .btn-primary { background: var(--primary); color: white; box-shadow: 0 4px 15px rgba(43,108,255,0.3); }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(43,108,255,0.4); }
+    button { width: 100%; padding: 15px; border: none; border-radius: 12px; background: var(--primary); color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
     
-    .btn-new { background: #64748b; color: white; margin-top: 20px; }
-    .btn-success { background: var(--success); color: white; display: none; text-decoration: none; text-align: center; margin-top: 10px; }
-
-    .hidden { display: none !important; }
-
-    footer { text-align: center; color: rgba(255,255,255,0.5); font-size: 12px; margin-top: 20px; }
+    #waveform { width: 100%; height: 120px; background: #fafafa; border-radius: 10px; border: 1px solid #eee; display: block; }
+    video { width: 100%; border-radius: 12px; margin-top: 10px; background: #000; }
+    #downloadBtn { display: none; margin-top: 12px; text-align: center; padding: 15px; background: var(--success); color: white; text-decoration: none; border-radius: 12px; font-weight: bold; }
   </style>
 </head>
 <body>
 
-<div class="bg-animation">
-  <div class="blob"></div>
-</div>
-
 <div class="app">
-  <div id="startScreen" class="card">
-    <h1>Pause Remover Pro</h1>
-    <p class="intro-text">
-      Ця програма автоматично аналізує ваше відео та видаляє моменти тиші, роблячи монтаж за лічені секунди. Ідеально для подкастів, лекцій та влогів.
-    </p>
-    <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
-      <span style="font-size: 40px;">🎬</span>
-      <p><b>Натисніть сюди, щоб обрати відео</b></p>
-      <input type="file" id="fileInput" accept="video/*" class="hidden">
-    </div>
+  <div class="card">
+    <h2>Remove Pauses</h2>
+    <input type="file" id="fileInput" accept="video/*">
   </div>
 
-  <div id="editorScreen" class="card hidden">
-    <h2>Налаштування</h2>
-    
-    <div class="tabs">
-      <div id="tabAuto" class="active-tab">Авто</div>
-      <div id="tabManual">Вручну</div>
-    </div>
-
-    <div id="manualControls" class="hidden">
-      <label>Поріг тиші</label>
-      <input type="range" id="threshold" min="-60" max="-10" value="-35">
-      <label>Мінімальна пауза</label>
-      <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
-    </div>
-
-    <div id="autoInfo" style="padding: 10px; font-size: 13px; color: #1e3a8a; background: #eef2ff; border-radius: 8px; margin-bottom: 10px;">
-      ✨ AI проаналізує звук і підбере оптимальні параметри автоматично.
-    </div>
-
-    <canvas id="waveform"></canvas>
-
-    <div class="video-container">
-      <video id="preview" controls></video>
-    </div>
-
-    <div class="progress-container" id="progCont">
-      <div id="statusText" style="font-size:14px; text-align:center; margin-bottom:5px;">Готуємо відео...</div>
-      <div class="progress-bg"><div id="progressBar"></div></div>
-    </div>
-
-    <button id="processBtn" class="btn btn-primary">ЗАПУСТИТИ ОБРОБКУ</button>
-    <a id="downloadBtn" class="btn btn-success" download="no_pauses.mp4">📥 СКАЧАТИ РЕЗУЛЬТАТ</a>
-
-    <button class="btn btn-new" onclick="location.reload()">➕ НОВЕ ВІДЕО</button>
+  <div class="card">
+  <div style="display: flex; background: #eee; border-radius: 10px; padding: 4px; margin-bottom: 15px;">
+    <div id="tabAuto" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px; background: var(--primary); color: white; font-weight: bold;">Авто</div>
+    <div id="tabManual" style="flex: 1; text-align: center; padding: 8px; cursor: pointer; border-radius: 8px;">Вручную</div>
   </div>
 
-  <footer>
-    Всі файли обробляються локально у вашому браузері
-  </footer>
+  <div id="manualControls" style="display: none;">
+    <label>Минимальная тишина</label>
+    <input type="range" id="duration" min="0.1" max="2.0" step="0.05" value="0.5">
+    <div class="slider-info"><span>Короткие паузы</span><span id="durationVal">0.5 сек</span></div>
+
+    <label>Чувствительность (dB)</label>
+    <input type="range" id="threshold" min="-60" max="-10" step="1" value="-35">
+    <div class="slider-info"><span>Тише</span><span id="thresholdVal">-35 dB</span></div>
+  </div>
+
+  <div id="autoInfo" style="padding: 10px; font-size: 14px; background: #f0f7ff; border-radius: 10px; border: 1px solid #d0e0ff; margin-bottom: 10px;">
+    ✨ Режим «Авто» подберет настройки под ваш звук.
+  </div>
+
+  <div class="progress-container" id="progCont">
+    <div id="statusText">Ожидание...</div>
+    <div class="progress-bg"><div id="progressBar"></div></div>
+    <div id="etaText">Осталось: -- сек</div>
+  </div>
+
+  <button id="processBtn">Запустить обработку</button>
 </div>
+  <div class="card">
+    <canvas id="waveform"></canvas>
+  </div>
 
-<script>
-  // Логіка перемикання екранів (не заважає script.js)
-  const fileInput = document.getElementById('fileInput');
-  const startScreen = document.getElementById('startScreen');
-  const editorScreen = document.getElementById('editorScreen');
-
-  fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-      startScreen.classList.add('hidden');
-      editorScreen.classList.remove('hidden');
-    }
-  });
-
-  // Логіка табів
-  const tAuto = document.getElementById('tabAuto');
-  const tManual = document.getElementById('tabManual');
-  const mControls = document.getElementById('manualControls');
-  const aInfo = document.getElementById('autoInfo');
-
-  tAuto.onclick = () => {
-    tAuto.classList.add('active-tab');
-    tManual.classList.remove('active-tab');
-    mControls.classList.add('hidden');
-    aInfo.classList.remove('hidden');
-  };
-
-  tManual.onclick = () => {
-    tManual.classList.add('active-tab');
-    tAuto.classList.remove('active-tab');
-    mControls.classList.remove('hidden');
-    aInfo.classList.add('hidden');
-  };
-</script>
+  <div class="card">
+    <video id="preview" controls></video>
+    <a id="downloadBtn" download="no_pauses.mp4">Скачать готовое видео</a>
+  </div>
+</div>
 
 <script src="./ffmpeg/ffmpeg.min.js"></script>
 <script src="script.js"></script>
