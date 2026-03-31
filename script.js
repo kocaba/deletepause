@@ -12,31 +12,33 @@ let sRate = 44100;
 let isLoaded = false;
 let cMode = 'auto';
 let wakeLock = null;
-let currentFile = null; // Файл після можливого remuxing
+let currentFile = null;
 
 const WINDOW_SIZE = 1024;
 
-// UI елементи
+// =========================
+// DOM ЕЛЕМЕНТИ
+// =========================
 const dom = {
-    fInp:   document.getElementById('real_f'),
-    sFile:  document.getElementById('step_file'),
-    sEdit:  document.getElementById('step_editor'),
-    sRes:   document.getElementById('step_result'),
-    ov:     document.getElementById('ov_scr_55'),
-    ovTitle:document.getElementById('ov_title'),
-    bar:    document.getElementById('p_bar_fill'),
-    ovPct:  document.getElementById('ov_pct'),
-    ovEta:  document.getElementById('ov_eta'),
-    cvs:    document.getElementById('wv_cvs_11'),
-    btnGo:  document.getElementById('go_proc'),
-    vPre:   document.getElementById('vid_pre_77'),
-    dl:     document.getElementById('dl_btn_99'),
-    dur:    document.getElementById('val_dur'),
-    db:     document.getElementById('val_db'),
-    txtDur: document.getElementById('txt_dur'),
-    txtDb:  document.getElementById('txt_db'),
-    aInfo:  document.getElementById('a_info'),
-    mCntrls:document.getElementById('m_cntrls'),
+    fInp:    document.getElementById('real_f'),
+    sFile:   document.getElementById('step_file'),
+    sEdit:   document.getElementById('step_editor'),
+    sRes:    document.getElementById('step_result'),
+    ov:      document.getElementById('ov_scr_55'),
+    ovTitle: document.getElementById('ov_title'),
+    bar:     document.getElementById('p_bar_fill'),
+    ovPct:   document.getElementById('ov_pct'),
+    ovEta:   document.getElementById('ov_eta'),
+    cvs:     document.getElementById('wv_cvs_11'),
+    btnGo:   document.getElementById('go_proc'),
+    vPre:    document.getElementById('vid_pre_77'),
+    dl:      document.getElementById('dl_btn_99'),
+    dur:     document.getElementById('val_dur'),
+    db:      document.getElementById('val_db'),
+    txtDur:  document.getElementById('txt_dur'),
+    txtDb:   document.getElementById('txt_db'),
+    aInfo:   document.getElementById('a_info'),
+    mCntrls: document.getElementById('m_cntrls'),
 };
 
 // =========================
@@ -63,7 +65,9 @@ function setTab(m) {
 document.getElementById('t_auto').onclick = () => setTab('auto');
 document.getElementById('t_manual').onclick = () => setTab('manual');
 
-// Слухаємо зміни повзунків — відразу перемальовуємо хвилю
+// =========================
+// ПОВЗУНКИ — динамічне оновлення хвилі
+// =========================
 dom.dur.oninput = () => {
     dom.txtDur.innerText = parseFloat(dom.dur.value).toFixed(2) + ' сек';
     if (aBuffer) drawWaveform();
@@ -87,7 +91,7 @@ function getAutoParams() {
 }
 
 // =========================
-// ПОШУК ПАУЗ (використовує кеш RMS)
+// ПОШУК ПАУЗ
 // =========================
 function detectSilences(db, minDur) {
     const limit = Math.pow(10, db / 20);
@@ -104,7 +108,6 @@ function detectSilences(db, minDur) {
             start = null;
         }
     }
-    // Якщо тиша до самого кінця
     if (start !== null) {
         const t = cRMS.length * secPerBlock;
         if (t - start >= minDur) silences.push({ st: start, en: t });
@@ -120,14 +123,18 @@ function drawWaveform() {
 
     const canvas = dom.cvs;
     const ctx = canvas.getContext('2d');
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
+
+    // Беремо реальний розмір елементу щоразу
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.floor(rect.width) || canvas.offsetWidth || 560;
+    canvas.height = 120;
+
     const w = canvas.width;
     const h = canvas.height;
 
     ctx.clearRect(0, 0, w, h);
 
-    // 1. Малюємо хвилю (синя)
+    // --- Синя хвиля ---
     const step = Math.ceil(aBuffer.length / w);
     ctx.fillStyle = '#2b6cff';
     for (let i = 0; i < w; i++) {
@@ -140,7 +147,7 @@ function drawWaveform() {
         ctx.fillRect(i, (1 + min) * (h / 2), 1, Math.max(1, (max - min) * (h / 2)));
     }
 
-    // 2. Визначаємо поточні параметри
+    // --- Визначаємо параметри ---
     let db, dur;
     if (cMode === 'auto') {
         const p = getAutoParams();
@@ -152,115 +159,150 @@ function drawWaveform() {
         dur = parseFloat(dom.dur.value);
     }
 
-    // 3. Малюємо червоні зони (паузи)
+    // --- Червоні зони (паузи будуть видалені) ---
     const silences = detectSilences(db, dur);
-    ctx.fillStyle = 'rgba(255, 50, 50, 0.45)';
+    ctx.fillStyle = 'rgba(220, 30, 30, 0.45)';
     silences.forEach(s => {
         const x1 = (s.st / aDur) * w;
         const x2 = (s.en / aDur) * w;
-        ctx.fillRect(x1, 0, Math.max(1, x2 - x1), h);
+        ctx.fillRect(x1, 0, Math.max(2, x2 - x1), h);
     });
 }
 
 // =========================
+// ДЕКОДУВАННЯ АУДІО
+// =========================
+async function decodeAudio(file) {
+    const aCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuf = await file.arrayBuffer();
+    const decoded = await aCtx.decodeAudioData(arrayBuf);
+    aBuffer = decoded.getChannelData(0);
+    aDur = decoded.duration;
+    sRate = decoded.sampleRate;
+
+    // Кеш RMS для швидкого аналізу
+    cRMS = [];
+    for (let i = 0; i < aBuffer.length; i += WINDOW_SIZE) {
+        let sum = 0;
+        for (let j = 0; j < WINDOW_SIZE; j++) {
+            const v = aBuffer[i + j] || 0;
+            sum += v * v;
+        }
+        cRMS.push(Math.sqrt(sum / WINDOW_SIZE));
+    }
+}
+
+// =========================
 // КРОК 1: ЗАВАНТАЖЕННЯ ФАЙЛУ
-// Підтримує: MOV з HEVC (iPhone стандартний), MOV з H.264 (режим сумісності), MP4
+// Підтримує: MOV HEVC, MOV H.264 (режим сумісності iPhone), MP4
 // =========================
 dom.fInp.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     dom.ov.style.display = 'flex';
-    dom.ovTitle.innerText = 'Завантаження FFmpeg...';
+    dom.ovTitle.innerText = 'Завантаження...';
     dom.ovPct.innerText = '';
-    dom.bar.style.width = '0%';
+    dom.ovEta.innerText = '';
+    dom.bar.style.width = '5%';
 
     try {
-        // Завантажуємо FFmpeg один раз
         if (!isLoaded) {
+            dom.ovTitle.innerText = 'Завантаження FFmpeg...';
             await ffmpeg.load();
             isLoaded = true;
         }
 
         const ext = file.name.split('.').pop().toLowerCase();
-        const isQuicktime = ext === 'mov' || file.type === 'video/quicktime' || file.type.includes('quicktime');
+        const isMov = ext === 'mov' || file.type === 'video/quicktime' || file.type.includes('quicktime');
 
         let workingFile = file;
 
-        if (isQuicktime) {
-            // --- REMUXING MOV → MP4 ---
-            // Спрацьовує і для HEVC (стандартний iPhone), і для H.264 (режим сумісності)
-            // -c copy = без перекодування, тільки перепакування контейнера
+        if (isMov) {
             dom.ovTitle.innerText = 'Конвертація MOV → MP4...';
             dom.ovEta.innerText = 'ЦЕ ЗАЙМЕ 1-2 СЕКУНДИ';
 
             ffmpeg.FS('writeFile', 'tmp_in.mov', await fetchFile(file));
 
+            let remuxSuccess = false;
+
+            // --- СПРОБА 1: Remux без перекодування (для HEVC та сумісного H.264) ---
             try {
-                // Спочатку пробуємо просту перепаковку (швидко, без втрати якості)
-                await ffmpeg.run('-i', 'tmp_in.mov', '-c', 'copy', '-map', '0', '-movflags', '+faststart', 'tmp_out.mp4');
-            } catch (remuxErr) {
-                // Якщо перепаковка не вдалась (наприклад, несумісний кодек) — перекодовуємо
-                console.warn('Remux failed, re-encoding...', remuxErr);
-                dom.ovTitle.innerText = 'Перекодування відео...';
                 await ffmpeg.run(
                     '-i', 'tmp_in.mov',
-                    '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
-                    '-c:a', 'aac',
-                    '-pix_fmt', 'yuv420p',
+                    '-c', 'copy',
+                    '-map', '0',
                     '-movflags', '+faststart',
-                    'tmp_out.mp4'
+                    'tmp_remux.mp4'
                 );
+
+                const remuxData = ffmpeg.FS('readFile', 'tmp_remux.mp4');
+                const testFile = new File([remuxData.buffer], 'remux.mp4', { type: 'video/mp4' });
+
+                // Перевіряємо чи аудіо читається
+                await decodeAudio(testFile);
+                workingFile = testFile;
+                remuxSuccess = true;
+                try { ffmpeg.FS('unlink', 'tmp_remux.mp4'); } catch(e) {}
+
+            } catch (err) {
+                console.warn('Remux або аудіодекодування не вдалось, перекодовуємо...', err);
+                remuxSuccess = false;
+                try { ffmpeg.FS('unlink', 'tmp_remux.mp4'); } catch(e) {}
             }
 
-            const data = ffmpeg.FS('readFile', 'tmp_out.mp4');
-            workingFile = new File([data.buffer], 'ready.mp4', { type: 'video/mp4' });
+            // --- СПРОБА 2: Повне перекодування (MOV H.264 режим максимальної сумісності) ---
+            if (!remuxSuccess) {
+                dom.ovTitle.innerText = 'Перекодування MOV H.264...';
+                dom.ovEta.innerText = 'ЗАЧЕКАЙТЕ, ЦЕ ЗАЙМЕ КІЛЬКА ХВИЛИН';
 
-            // Прибираємо тимчасові файли з пам'яті FFmpeg
+                await ffmpeg.run(
+                    '-i', 'tmp_in.mov',
+                    '-c:v', 'libx264',
+                    '-preset', 'ultrafast',
+                    '-crf', '22',
+                    '-c:a', 'aac',
+                    '-ar', '44100',
+                    '-ac', '1',
+                    '-pix_fmt', 'yuv420p',
+                    '-movflags', '+faststart',
+                    'tmp_encoded.mp4'
+                );
+
+                const encData = ffmpeg.FS('readFile', 'tmp_encoded.mp4');
+                workingFile = new File([encData.buffer], 'encoded.mp4', { type: 'video/mp4' });
+                await decodeAudio(workingFile);
+                try { ffmpeg.FS('unlink', 'tmp_encoded.mp4'); } catch(e) {}
+            }
+
             try { ffmpeg.FS('unlink', 'tmp_in.mov'); } catch(e) {}
-            try { ffmpeg.FS('unlink', 'tmp_out.mp4'); } catch(e) {}
+
+        } else {
+            // MP4 та інші — просто декодуємо
+            dom.ovTitle.innerText = 'Аналіз звукової доріжки...';
+            await decodeAudio(file);
+            workingFile = file;
         }
 
         currentFile = workingFile;
-
-        // --- ДЕКОДУВАННЯ АУДІО ---
-        dom.ovTitle.innerText = 'Аналіз звукової доріжки...';
-        dom.ovEta.innerText = '';
-
-        const aCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const arrayBuf = await workingFile.arrayBuffer();
-        const decoded = await aCtx.decodeAudioData(arrayBuf);
-
-        aBuffer = decoded.getChannelData(0);
-        aDur = decoded.duration;
-        sRate = decoded.sampleRate;
-
-        // Розрахунок кешу RMS
-        cRMS = [];
-        for (let i = 0; i < aBuffer.length; i += WINDOW_SIZE) {
-            let sum = 0;
-            for (let j = 0; j < WINDOW_SIZE; j++) {
-                const v = aBuffer[i + j] || 0;
-                sum += v * v;
-            }
-            cRMS.push(Math.sqrt(sum / WINDOW_SIZE));
-        }
 
         // Показуємо редактор
         dom.sFile.classList.add('hidden_node');
         dom.sEdit.classList.remove('hidden_node');
 
-        // Встановлюємо прев'ю (вже конвертований файл для сумісності)
+        // Прев'ю відео
         dom.vPre.src = URL.createObjectURL(workingFile);
 
         dom.ov.style.display = 'none';
 
-        // Малюємо хвилю після того як canvas видимий
-        requestAnimationFrame(() => drawWaveform());
+        // Малюємо хвилю після того як canvas стає видимим
+        requestAnimationFrame(() => {
+            setTimeout(() => drawWaveform(), 80);
+        });
 
     } catch (err) {
-        console.error('File load error:', err);
-        alert('Помилка обробки файлу. Спробуйте інший файл або формат.\n\n' + err.message);
+        console.error('Помилка завантаження:', err);
+        alert('Помилка обробки файлу.\n\n' + err.message);
         dom.ov.style.display = 'none';
     }
 };
@@ -281,7 +323,6 @@ dom.btnGo.onclick = async () => {
     dom.bar.style.width = '0%';
 
     try {
-        // Вибір параметрів
         let db, dur;
         if (cMode === 'auto') {
             const p = getAutoParams();
@@ -292,11 +333,10 @@ dom.btnGo.onclick = async () => {
             dur = parseFloat(dom.dur.value);
         }
 
-        // Пошук пауз
         const silences = detectSilences(db, dur);
 
-        // Формування сегментів мовлення
-        const PAD = 0.1; // відступ для плавності
+        // Формуємо сегменти мовлення (зворотне від пауз)
+        const PAD = 0.1;
         const segs = [];
         let prev = 0;
 
@@ -323,7 +363,6 @@ dom.btnGo.onclick = async () => {
 
         const tOut = segs.reduce((acc, s) => acc + (s.e - s.s), 0);
 
-        // Записуємо файл у FFmpeg FS
         ffmpeg.FS('writeFile', 'working.mp4', await fetchFile(currentFile));
 
         // Будуємо filter_complex
@@ -354,7 +393,6 @@ dom.btnGo.onclick = async () => {
             }
         });
 
-        // Запуск FFmpeg
         await ffmpeg.run(
             '-i', 'working.mp4',
             '-filter_complex', filterStr,
@@ -363,16 +401,13 @@ dom.btnGo.onclick = async () => {
             '-c:v', 'libx264',
             '-preset', 'ultrafast',
             '-crf', '23',
-            '-pix_fmt', 'yuv420p',  // Сумісність з iOS
+            '-pix_fmt', 'yuv420p',
             '-c:a', 'aac',
             '-movflags', '+faststart',
             'final.mp4'
         );
 
-        // Читаємо результат
         const data = ffmpeg.FS('readFile', 'final.mp4');
-
-        // Прибираємо тимчасові файли
         try { ffmpeg.FS('unlink', 'working.mp4'); } catch(e) {}
         try { ffmpeg.FS('unlink', 'final.mp4'); } catch(e) {}
 
@@ -381,7 +416,6 @@ dom.btnGo.onclick = async () => {
         dom.bar.style.width = '100%';
         dom.ovPct.innerText = '100%';
 
-        // Показуємо результат
         setTimeout(() => {
             dom.vPre.src = url;
             dom.dl.href = url;
@@ -392,7 +426,7 @@ dom.btnGo.onclick = async () => {
         }, 300);
 
     } catch (err) {
-        console.error('Render error:', err);
+        console.error('Помилка рендерингу:', err);
         alert('Помилка рендерингу: ' + err.message);
         dom.ov.style.display = 'none';
     } finally {
