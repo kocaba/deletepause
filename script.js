@@ -518,33 +518,58 @@ dom.btnGo.onclick = async () => {
             'final.mp4'
         );
 
-        // [RAM — КРИТИЧНО ДЛЯ SAFARI]
-        // Порядок операцій важливий для мінімізації пікової пам'яті:
+        // ===================================================
+        // [RAM — КРИТИЧНО ДЛЯ SAFARI / iPHONE]
         //
-        // КРОК A: Читаємо вихідний файл → Uint8Array (~50MB)
+        // ПРАВИЛЬНИЙ порядок звільнення пам'яті після рендеру:
+        //
+        //  РАНІШЕ (ПОГАНО):
+        //    readFile(final) → unlink input → unlink final → Blob
+        //    Пік: input (~200MB) + final (~50MB) + Uint8Array (~50MB) = ~300MB+ одночасно
+        //    → Safari падає саме тут
+        //
+        //  ТЕПЕР (ПРАВИЛЬНО):
+        //    unlink input → GC yield → readFile(final) → unlink final → Blob → null data
+        //    Пік: final (~50MB) + Uint8Array (~50MB) = ~100MB максимум
+        //    → значно менший пік, Safari виживає
+        // ===================================================
+
+        // КРОК 1: СПОЧАТКУ видаляємо вхідний файл (~150-300MB) — він більше не потрібен
+        // Це найважливіший крок — input займає найбільше пам'яті
+        try { ffmpeg.FS('unlink', inputFsName); } catch(_) {}
+        inputFsName = null;
+
+        // КРОК 2: Звільняємо aBuffer і cRMS — вони більше не потрібні після рендеру
+        // aBuffer: Float32Array (~(тривалість * 16000 * 4) байт, наприклад 3хв = ~11MB)
+        // cRMS: масив floats (~невеликий, але теж звільняємо)
+        aBuffer = null;
+        cRMS    = [];
+
+        // КРОК 3: Даємо браузеру "подих" — yield to GC перед важкою операцією
+        // setTimeout(0) дозволяє Safari запустити GC і звільнити пам'ять
+        // до того як ми алокуємо новий великий буфер
+        await new Promise(r => setTimeout(r, 50));
+
+        // КРОК 4: Тільки тепер читаємо final.mp4 → Uint8Array
+        // Тепер в WASM heap є тільки final.mp4, input вже прибрано
+        setProgress(99, 'Збереження...');
         const data = ffmpeg.FS('readFile', 'final.mp4');
 
-        // КРОК B: ОДРАЗУ видаляємо inputFsName з FS — звільняємо ~150-300MB з WASM heap
-        // Він більше не потрібен — рендер завершено
-        try { ffmpeg.FS('unlink', inputFsName); } catch(_) {}
-
-        // КРОК C: ОДРАЗУ видаляємо final.mp4 з FS — звільняємо FS копію (~50MB)
-        // data вже тримає Uint8Array — нам FS копія більше не потрібна
+        // КРОК 5: ОДРАЗУ видаляємо final.mp4 з FS — звільняємо FS копію
+        // data вже тримає Uint8Array — FS копія більше не потрібна
         try { ffmpeg.FS('unlink', 'final.mp4'); } catch(_) {}
 
-        // [RAM] Тепер в пам'яті: тільки data (Uint8Array, ~50MB)
-        // FS звільнено від обох великих файлів
+        // КРОК 6: Ще один yield — даємо GC зібрати WASM heap від final.mp4
+        await new Promise(r => setTimeout(r, 50));
 
-        // КРОК D: Створюємо Blob БЕЗ додаткових копій
-        // Увага: new Blob([data.buffer]) — передаємо ArrayBuffer напряму
-        // Браузер може використати той самий буфер (zero-copy) або зробити копію —
-        // але FS вже звільнено, тому пікової суми двох великих буферів не буде
+        // КРОК 7: Створюємо Blob
+        // Тепер в пам'яті: тільки data (Uint8Array, ~50MB) — більше нічого великого
         const blob = new Blob([data.buffer], { type: 'video/mp4' });
 
-        // [RAM] Явно нулюємо data після створення Blob — підказка GC
-        // Після передачі buffer в Blob він може стати detached або просто
-        // GC збере data при наступній можливості
-        // data = null; // НЕ робимо — може зламати Safari (detached buffer edge case)
+        // КРОК 8: Нулюємо data — підказка GC що Uint8Array більше не потрібен
+        // Після передачі .buffer в Blob Safari може звільнити оригінальний буфер
+        // eslint-disable-next-line no-unused-vars
+        // (присвоєння в const неможливе — але браузер сам збере при наступному GC)
 
         // [RAM] Трекаємо URL щоб revoke при наступному виклику
         const url = createAndTrackURL(blob);
@@ -563,8 +588,9 @@ dom.btnGo.onclick = async () => {
     } catch (err) {
         console.error('Render error:', err);
         // [RAM] При помилці теж чистимо FS
-        try { ffmpeg.FS('unlink', inputFsName); } catch(_) {}
-        try { ffmpeg.FS('unlink', 'final.mp4');  } catch(_) {}
+        // inputFsName може бути вже null якщо встигли зробити unlink до помилки
+        if (inputFsName) { try { ffmpeg.FS('unlink', inputFsName); } catch(_) {} }
+        try { ffmpeg.FS('unlink', 'final.mp4'); } catch(_) {}
         hideOverlay();
         alert('Помилка рендерингу: ' + err.message);
     } finally {
