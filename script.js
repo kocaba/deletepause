@@ -2,24 +2,21 @@
 // ІНІЦІАЛІЗАЦІЯ FFMPEG
 // =========================
 const { createFFmpeg, fetchFile } = FFmpeg;
-const ffmpeg = createFFmpeg({
-    log: false,
-    corePath: './ffmpeg/ffmpeg-core.js'
-});
+const ffmpeg = createFFmpeg({ log: false, corePath: './ffmpeg/ffmpeg-core.js' });
 
-let aBuffer = null;   // Float32Array — канал аудіо
-let cRMS    = [];     // масив RMS-значень для визначення пауз
-let aDur    = 0;      // тривалість аудіо (секунди)
-let sRate   = 44100;  // частота дискретизації
-let isLoaded = false;
-let cMode   = 'auto';
-let wakeLock = null;
-let originalFile = null; // оригінальний File — ніколи не читається в RAM зайвий раз
+let aBuffer     = null;   // Float32Array — аудіо канал для waveform
+let cRMS        = [];     // RMS по вікнах — для detectSilences
+let aDur        = 0;      // тривалість аудіо (сек)
+let sRate       = 22050;  // частота дискретизації
+let isLoaded    = false;
+let cMode       = 'auto';
+let wakeLock    = null;
+let inputFsName = 'working.mp4'; // ім'я відеофайлу в FFmpeg FS — не читаємо назад в JS!
 
-const WINDOW_SIZE = 1024; // вікно для RMS (~23 мс при 44100 Гц)
+const WINDOW_SIZE = 1024;
 
 // =========================
-// DOM-посилання
+// DOM
 // =========================
 const dom = {
     fInp:    document.getElementById('real_f'),
@@ -47,9 +44,7 @@ const dom = {
 // WAKE LOCK
 // =========================
 async function lock() {
-    try {
-        if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
-    } catch(e) {}
+    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch(e) {}
 }
 function unlock() {
     if (wakeLock) { wakeLock.release(); wakeLock = null; }
@@ -61,9 +56,9 @@ function unlock() {
 function showOverlay(title, eta) {
     dom.ov.style.display = 'flex';
     dom.ovTitle.innerText = title;
-    dom.ovEta.innerText = eta || '';
-    dom.ovPct.innerText = '';
-    dom.bar.style.width = '0%';
+    dom.ovEta.innerText   = eta || '';
+    dom.ovPct.innerText   = '';
+    dom.bar.style.width   = '0%';
 }
 function setProgress(pct, eta) {
     dom.bar.style.width = Math.min(100, pct) + '%';
@@ -75,38 +70,31 @@ function hideOverlay() {
 }
 
 // =========================
-// ВКЛАДКИ (auto / manual)
+// TABS
 // =========================
 function setTab(m) {
     cMode = m;
     document.getElementById('t_auto').classList.toggle('active_t', m === 'auto');
     document.getElementById('t_manual').classList.toggle('active_t', m === 'manual');
-
-    // Гарантовано показуємо/ховаємо елементи
-    if (m === 'manual') {
-        dom.mCntrls.style.display = 'block';
-        dom.aInfo.style.display = 'none';
-    } else {
-        dom.mCntrls.style.display = 'none';
-        dom.aInfo.style.display = 'block';
-    }
-
+    // Перемикаємо через style.display — надійніше ніж hidden_node для повзунків
+    dom.mCntrls.style.display = (m === 'manual') ? 'block' : 'none';
+    dom.aInfo.style.display   = (m === 'auto')   ? 'block' : 'none';
     if (aBuffer) drawWaveform();
 }
-document.getElementById('t_auto').addEventListener('click', () => setTab('auto'));
-document.getElementById('t_manual').addEventListener('click', () => setTab('manual'));
+document.getElementById('t_auto').onclick   = () => setTab('auto');
+document.getElementById('t_manual').onclick = () => setTab('manual');
 
 // =========================
-// ПОВЗУНКИ — миттєвий перерахунок
+// ПОВЗУНКИ — миттєве оновлення waveform
 // =========================
-dom.dur.addEventListener('input', () => {
+dom.dur.oninput = () => {
     dom.txtDur.innerText = parseFloat(dom.dur.value).toFixed(2) + ' сек';
     if (aBuffer) drawWaveform();
-});
-dom.db.addEventListener('input', () => {
+};
+dom.db.oninput = () => {
     dom.txtDb.innerText = dom.db.value + ' dB';
     if (aBuffer) drawWaveform();
-});
+};
 
 // =========================
 // АВТО-ПАРАМЕТРИ
@@ -124,9 +112,9 @@ function getAutoParams() {
 // ВИЗНАЧЕННЯ ПАУЗ
 // =========================
 function detectSilences(db, minDur) {
-    const limit = Math.pow(10, db / 20);
-    const silences = [];
+    const limit       = Math.pow(10, db / 20);
     const secPerBlock = WINDOW_SIZE / sRate;
+    const silences    = [];
     let start = null;
 
     for (let i = 0; i < cRMS.length; i++) {
@@ -146,21 +134,21 @@ function detectSilences(db, minDur) {
 }
 
 // =========================
-// МАЛЮВАННЯ WAVEFORM
+// WAVEFORM
 // =========================
 function drawWaveform() {
     if (!aBuffer) return;
 
     const canvas = dom.cvs;
-    const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    canvas.width  = Math.floor(rect.width) || 560;
+    const ctx    = canvas.getContext('2d');
+    const rect   = canvas.getBoundingClientRect();
+    canvas.width  = Math.floor(rect.width) || canvas.offsetWidth || 560;
     canvas.height = 120;
     const w = canvas.width, h = canvas.height;
 
     ctx.clearRect(0, 0, w, h);
 
-    // Малюємо форму хвилі
+    // Синя хвиля
     const step = Math.max(1, Math.ceil(aBuffer.length / w));
     ctx.fillStyle = '#2b6cff';
     for (let i = 0; i < w; i++) {
@@ -174,19 +162,18 @@ function drawWaveform() {
         ctx.fillRect(i, (1 + mn) * (h / 2), 1, Math.max(1, (mx - mn) * (h / 2)));
     }
 
-    // Визначаємо параметри залежно від режиму
+    // Параметри
     let db, dur;
     if (cMode === 'auto') {
         const p = getAutoParams();
-        db  = p.db;
-        dur = p.dur;
+        db = p.db; dur = p.dur;
         dom.aInfo.innerText = `✨ Авто: поріг ${db} dB, мін. пауза ${dur} сек`;
     } else {
         db  = parseFloat(dom.db.value);
         dur = parseFloat(dom.dur.value);
     }
 
-    // Малюємо червоні ділянки (паузи)
+    // Червоні паузи
     ctx.fillStyle = 'rgba(220, 30, 30, 0.45)';
     detectSilences(db, dur).forEach(s => {
         const x1 = (s.st / aDur) * w;
@@ -196,153 +183,235 @@ function drawWaveform() {
 }
 
 // =========================
-// КРОК 1: ЗАВАНТАЖЕННЯ + АНАЛІЗ
+// ВИТЯГТИ АУДІО З FS → DECODE → RMS
 //
-// Використовує ТІЛЬКИ Web Audio API — без FFmpeg!
-// Safari підтримує decodeAudioData для MOV/MP4/HEVC
-// якщо браузер підтримує кодек (зазвичай так на iPhone)
+// fsInputName — ім'я файлу вже в FFmpeg FS (working.mp4)
+// Витягуємо маленький WAV (~1-3 MB) замість читання всього відео
+// Це ключ до роботи на iPhone без OOM
 // =========================
-dom.fInp.addEventListener('change', async (e) => {
+async function extractAndDecodeAudio(fsInputName) {
+    dom.ovTitle.innerText = 'Аналіз звуку...';
+    dom.ovEta.innerText   = 'ВИЗНАЧЕННЯ ПАУЗ';
+    setProgress(35);
+
+    // Логер для прогресу витягнення аудіо
+    ffmpeg.setLogger(({ message }) => {
+        const m = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
+        if (m) {
+            const t = parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseFloat(m[3]);
+            dom.ovEta.innerText = `Зчитано: ${Math.floor(t)} сек`;
+        }
+    });
+
+    await ffmpeg.run(
+        '-i', fsInputName,
+        '-vn',               // тільки аудіо, без відео
+        '-ar', '22050',      // знижена частота — вдвічі менше даних
+        '-ac', '1',          // моно
+        '-c:a', 'pcm_s16le', // WAV — Safari декодує без проблем
+        'audio_only.wav'
+    );
+
+    setProgress(60);
+
+    const wavData = ffmpeg.FS('readFile', 'audio_only.wav');
+    try { ffmpeg.FS('unlink', 'audio_only.wav'); } catch(_) {}
+
+    // Декодуємо через Web Audio API
+    const aCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 22050 });
+    const decoded = await aCtx.decodeAudioData(wavData.buffer);
+    if (aCtx.close) aCtx.close();
+
+    aBuffer = decoded.getChannelData(0);
+    aDur    = decoded.duration;
+    sRate   = decoded.sampleRate;
+
+    setProgress(80);
+
+    // Рахуємо RMS кеш
+    cRMS = [];
+    for (let i = 0; i < aBuffer.length; i += WINDOW_SIZE) {
+        let sum = 0;
+        const end = Math.min(i + WINDOW_SIZE, aBuffer.length);
+        for (let j = i; j < end; j++) sum += aBuffer[j] * aBuffer[j];
+        cRMS.push(Math.sqrt(sum / (end - i)));
+    }
+
+    setProgress(95);
+}
+
+// =========================
+// ПРОГРЕС ЛОГЕР ДЛЯ РЕНДЕРУ
+// =========================
+function setupRenderLogger(totalDur, startMs) {
+    ffmpeg.setLogger(({ message }) => {
+        const mTime = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
+        if (mTime && totalDur > 0) {
+            const t   = parseInt(mTime[1]) * 3600 + parseInt(mTime[2]) * 60 + parseFloat(mTime[3]);
+            const pct = Math.min(99, (t / totalDur) * 100);
+            setProgress(pct);
+            const elapsed = (Date.now() - startMs) / 1000;
+            if (elapsed > 1 && t > 0) {
+                const eta = Math.round((totalDur - t) / (t / elapsed));
+                if (eta > 0) dom.ovEta.innerText = `Залишилось ~${eta} сек.`;
+            }
+            return;
+        }
+        const mSize = message.match(/size=\s*(\d+)kB/);
+        if (mSize) {
+            dom.ovEta.innerText = `Оброблено: ${(parseInt(mSize[1]) / 1024).toFixed(1)} МБ`;
+        }
+    });
+}
+
+// =========================
+// КРОК 1: ЗАВАНТАЖЕННЯ
+//
+// Стратегія (як у версії що працювала на iPhone):
+//   1. Завантажуємо файл у FFmpeg FS
+//   2. Для MOV — remux або encode → working.mp4
+//   3. Витягуємо тільки аудіо для аналізу
+//   4. working.mp4 ЗАЛИШАЄТЬСЯ в FS — не читаємо назад!
+//   5. Рендер на кроці 2 використовує той самий working.mp4 з FS
+// =========================
+dom.fInp.onchange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    originalFile = file;
-
-    showOverlay('Аналіз відео...', 'ЧИТАННЯ АУДІО');
+    showOverlay('Підготовка...', '');
     setProgress(5);
 
     try {
-        // Читаємо файл як ArrayBuffer ОДИН РАЗ
-        // НЕ зберігаємо посилання — GC звільнить після decodeAudioData
-        showOverlay('Аналіз відео...', 'РОЗПАКУВАННЯ АУДІО...');
-        setProgress(15);
+        if (!isLoaded) {
+            dom.ovTitle.innerText = 'Завантаження движка...';
+            dom.ovEta.innerText   = '';
+            await ffmpeg.load();
+            isLoaded = true;
+        }
 
-        const fileBuffer = await file.arrayBuffer();
-        setProgress(35);
+        // Очищаємо старі файли з FS
+        for (const n of ['tmp_in.mov', 'working.mp4', 'audio_only.wav', 'final.mp4']) {
+            try { ffmpeg.FS('unlink', n); } catch(_) {}
+        }
 
-        // Декодуємо через Web Audio API
-        // Safari на iPhone підтримує MOV H.264 та HEVC через цей API
-        const aCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 22050 });
+        const ext   = (file.name.split('.').pop() || 'mp4').toLowerCase();
+        const isMov = ext === 'mov' || file.type === 'video/quicktime' || file.type.includes('quicktime');
 
-        let decoded;
-        try {
-            decoded = await aCtx.decodeAudioData(fileBuffer);
-        } catch (decodeErr) {
-            // Якщо Safari не може декодувати безпосередньо — спробуємо через FFmpeg
-            console.warn('Direct decode failed, using FFmpeg fallback:', decodeErr);
+        if (isMov) {
+            dom.ovTitle.innerText = 'Завантаження файлу...';
+            dom.ovEta.innerText   = 'ЗАЧЕКАЙТЕ';
+            setProgress(10);
 
-            if (aCtx.close) aCtx.close();
+            ffmpeg.FS('writeFile', 'tmp_in.mov', await fetchFile(file));
+            setProgress(20);
 
-            showOverlay('Підготовка аудіо...', 'ВИКОРИСТОВУЄМО FFMPEG');
-            setProgress(40);
+            // --- Спроба 1: Remux без перекодування (швидко) ---
+            dom.ovTitle.innerText = 'Підготовка MOV...';
+            dom.ovEta.innerText   = 'КІЛЬКА СЕКУНД';
 
-            if (!isLoaded) {
-                showOverlay('Завантаження движка...', '');
-                await ffmpeg.load();
-                isLoaded = true;
+            setupRenderLogger(0, Date.now());
+
+            let remuxOk = false;
+            try {
+                await ffmpeg.run(
+                    '-i', 'tmp_in.mov',
+                    '-c', 'copy',
+                    '-map', '0',
+                    '-movflags', '+faststart',
+                    'working.mp4'
+                );
+                // Перевіряємо що аудіо витягується нормально
+                await extractAndDecodeAudio('working.mp4');
+                remuxOk = true;
+            } catch (err) {
+                console.warn('Remux або аналіз аудіо не вдався, спроба encode:', err);
+                remuxOk = false;
+                try { ffmpeg.FS('unlink', 'working.mp4'); } catch(_) {}
             }
 
-            setProgress(50, 'ВИТЯГУЄМО АУДІО...');
+            // --- Спроба 2: Encode (повільніше, але надійно) ---
+            if (!remuxOk) {
+                dom.ovTitle.innerText = 'Конвертація відео...';
+                dom.ovEta.innerText   = 'ЦЕ ЗАЙМЕ ХВИЛИНУ';
+                setProgress(15);
 
-            const ext = (file.name.split('.').pop() || 'mp4').toLowerCase();
-            const srcName = 'src_for_audio.' + ext;
+                setupRenderLogger(0, Date.now());
 
-            // Записуємо у FS і одразу видаляємо буфер з JS — звільняємо RAM
-            ffmpeg.FS('writeFile', srcName, new Uint8Array(fileBuffer));
+                await ffmpeg.run(
+                    '-i', 'tmp_in.mov',
+                    '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+                    '-c:a', 'aac', '-ar', '44100', '-ac', '1',
+                    '-pix_fmt', 'yuv420p',
+                    '-movflags', '+faststart',
+                    'working.mp4'
+                );
 
-            ffmpeg.setLogger(({ message }) => {
-                const m = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
-                if (m) {
-                    const t = parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseFloat(m[3]);
-                    dom.ovEta.innerText = `Зчитано: ${Math.floor(t)} сек`;
-                }
-            });
+                await extractAndDecodeAudio('working.mp4');
+            }
 
-            await ffmpeg.run(
-                '-i', srcName,
-                '-vn', '-ar', '22050', '-ac', '1',
-                '-c:a', 'pcm_s16le',
-                'audio_for_analysis.wav'
-            );
+            // MOV більше не потрібен — видаляємо, звільняємо місце
+            try { ffmpeg.FS('unlink', 'tmp_in.mov'); } catch(_) {}
 
-            try { ffmpeg.FS('unlink', srcName); } catch(_) {}
+        } else {
+            // MP4 та інші
+            dom.ovTitle.innerText = 'Завантаження файлу...';
+            dom.ovEta.innerText   = 'ЗАЧЕКАЙТЕ';
+            setProgress(10);
 
-            const wavData = ffmpeg.FS('readFile', 'audio_for_analysis.wav');
-            try { ffmpeg.FS('unlink', 'audio_for_analysis.wav'); } catch(_) {}
+            ffmpeg.FS('writeFile', 'working.mp4', await fetchFile(file));
+            setProgress(20);
 
-            setProgress(75, 'ДЕКОДУВАННЯ...');
-
-            const aCtx2 = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 22050 });
-            decoded = await aCtx2.decodeAudioData(wavData.buffer);
-            if (aCtx2.close) aCtx2.close();
+            await extractAndDecodeAudio('working.mp4');
         }
 
-        setProgress(80, 'ОБРОБКА ХВИЛІ...');
+        // working.mp4 ЗАЛИШАЄТЬСЯ в FFmpeg FS — рендер на кроці 2 використає його!
+        inputFsName = 'working.mp4';
 
-        aBuffer = decoded.getChannelData(0);
-        aDur    = decoded.duration;
-        sRate   = decoded.sampleRate;
-
-        // Рахуємо RMS по вікнах
-        cRMS = [];
-        for (let i = 0; i < aBuffer.length; i += WINDOW_SIZE) {
-            let sum = 0;
-            const end = Math.min(i + WINDOW_SIZE, aBuffer.length);
-            for (let j = i; j < end; j++) sum += aBuffer[j] * aBuffer[j];
-            cRMS.push(Math.sqrt(sum / (end - i)));
-        }
-
-        setProgress(100, 'ГОТОВО!');
-
-        // Прев'ю через object URL — не займає оперативну пам'ять (потоковий)
-        dom.vPre.src = URL.createObjectURL(file);
+        // Ініціалізуємо повзунки авто-значеннями
+        const autoP = getAutoParams();
+        dom.db.value  = autoP.db;
+        dom.dur.value = autoP.dur;
+        dom.txtDb.innerText  = autoP.db + ' dB';
+        dom.txtDur.innerText = autoP.dur.toFixed(2) + ' сек';
 
         // Показуємо редактор
         dom.sFile.classList.add('hidden_node');
         dom.sEdit.classList.remove('hidden_node');
 
-        // Ініціалізація повзунків для manual режиму
-        const autoP = getAutoParams();
-        dom.db.value   = autoP.db;
-        dom.dur.value  = autoP.dur;
-        dom.txtDb.innerText  = autoP.db + ' dB';
-        dom.txtDur.innerText = autoP.dur.toFixed(2) + ' сек';
+        // Прев'ю: об'єктний URL з оригінального File — браузер стримить з диска,
+        // не займає оперативну пам'ять
+        dom.vPre.src = URL.createObjectURL(file);
 
         hideOverlay();
 
-        // Малюємо waveform після того як canvas відрендерився
-        requestAnimationFrame(() => {
-            setTimeout(() => drawWaveform(), 80);
-        });
+        // Waveform малюємо після того як canvas стане видимим у DOM
+        requestAnimationFrame(() => setTimeout(() => drawWaveform(), 80));
 
     } catch (err) {
         console.error('Load error:', err);
         hideOverlay();
-        alert('Помилка завантаження файлу:\n\n' + err.message);
+        alert('Помилка обробки файлу.\n\n' + err.message);
     }
-});
+};
 
 // =========================
-// КРОК 2: РЕНДЕР — вирізаємо паузи через FFmpeg
+// КРОК 2: РЕНДЕР — вирізаємо паузи
 //
-// Запускається ТІЛЬКИ тут — оригінальний файл зчитується
-// один раз і одразу записується у FFmpeg FS.
-// Проміжні файли видаляються після кожного кроку.
+// working.mp4 вже є в FFmpeg FS з кроку 1 — НЕ завантажуємо знову!
+// Це ключ: на iPhone немає подвоєння файлу в RAM
 // =========================
-dom.btnGo.addEventListener('click', async () => {
-    if (!originalFile || !aBuffer) return;
+dom.btnGo.onclick = async () => {
+    if (!aBuffer || !inputFsName) return;
 
     dom.btnGo.disabled = true;
     await lock();
-    showOverlay('Монтаж відео...', 'ПІДГОТОВКА');
+    showOverlay('Монтаж відео...', 'МОНТАЖ У ПРОЦЕСІ');
 
     try {
-        // Параметри виявлення пауз
         let db, dur;
         if (cMode === 'auto') {
             const p = getAutoParams();
-            db  = p.db;
-            dur = p.dur;
+            db = p.db; dur = p.dur;
         } else {
             db  = parseFloat(dom.db.value);
             dur = parseFloat(dom.dur.value);
@@ -350,8 +419,8 @@ dom.btnGo.addEventListener('click', async () => {
 
         const silences = detectSilences(db, dur);
 
-        // Будуємо сегменти для збереження (інвертуємо паузи)
-        const PAD = 0.1; // невеликий відступ щоб уникнути різких стиків
+        // Будуємо сегменти для збереження
+        const PAD  = 0.1;
         const segs = [];
         let prev = 0;
 
@@ -375,126 +444,23 @@ dom.btnGo.addEventListener('click', async () => {
             return;
         }
 
-        const tOut = segs.reduce((a, s) => a + (s.e - s.s), 0);
+        const tOut = segs.reduce((acc, s) => acc + (s.e - s.s), 0);
 
-        // Завантажуємо FFmpeg якщо ще не завантажено
-        if (!isLoaded) {
-            setProgress(5, 'ЗАВАНТАЖЕННЯ ДВИЖКА...');
-            await ffmpeg.load();
-            isLoaded = true;
-        }
-
-        // Записуємо оригінальний файл у FFmpeg FS
-        // Це єдиний момент де він потрапляє в RAM разом з FFmpeg
-        setProgress(10, 'ЧИТАННЯ ФАЙЛУ...');
-
-        const ext = (originalFile.name.split('.').pop() || 'mp4').toLowerCase();
-        const srcName = 'src_video.' + ext;
-
-        // Очищаємо FS від можливих попередніх файлів
-        for (const n of [srcName, 'remuxed.mp4', 'encoded.mp4', 'final.mp4']) {
-            try { ffmpeg.FS('unlink', n); } catch(_) {}
-        }
-
-        // fetchFile стримить файл — не дублює в RAM
-        ffmpeg.FS('writeFile', srcName, await fetchFile(originalFile));
-        setProgress(20, 'АНАЛІЗ ФОРМАТУ...');
-
-        // --- ПІДГОТОВКА: MOV → MP4 remux якщо потрібно ---
-        let videoFsName = srcName;
-        const isMov = ext === 'mov';
-
-        if (isMov) {
-            dom.ovTitle.innerText = 'Підготовка MOV...';
-            dom.ovEta.innerText   = 'REMUX БЕЗ ПЕРЕКОДУВАННЯ';
-            setProgress(25);
-
-            ffmpeg.setLogger(({ message }) => {
-                const m = message.match(/size=\s*(\d+)kB/);
-                if (m) dom.ovEta.innerText = `Оброблено: ${(parseInt(m[1]) / 1024).toFixed(1)} МБ`;
-            });
-
-            let remuxOk = false;
-            try {
-                await ffmpeg.run(
-                    '-i', srcName,
-                    '-c', 'copy',
-                    '-map', '0',
-                    '-movflags', '+faststart',
-                    'remuxed.mp4'
-                );
-                remuxOk = true;
-            } catch (remuxErr) {
-                console.warn('Remux failed:', remuxErr);
-                // Видаляємо невдалий файл
-                try { ffmpeg.FS('unlink', 'remuxed.mp4'); } catch(_) {}
-            }
-
-            if (remuxOk) {
-                // Видаляємо вихідний MOV — звільняємо місце
-                try { ffmpeg.FS('unlink', srcName); } catch(_) {}
-                videoFsName = 'remuxed.mp4';
-            } else {
-                // Fallback: перекодуємо H.264
-                dom.ovTitle.innerText = 'Конвертація відео...';
-                dom.ovEta.innerText   = 'ЗАЧЕКАЙТЕ';
-                setProgress(25);
-
-                ffmpeg.setLogger(({ message }) => {
-                    const m = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
-                    if (m) {
-                        const t = parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseFloat(m[3]);
-                        dom.ovEta.innerText = `Конвертовано: ${Math.floor(t)} сек`;
-                    }
-                });
-
-                await ffmpeg.run(
-                    '-i', srcName,
-                    '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
-                    '-c:a', 'aac', '-ar', '44100',
-                    '-pix_fmt', 'yuv420p',
-                    '-movflags', '+faststart',
-                    'encoded.mp4'
-                );
-                try { ffmpeg.FS('unlink', srcName); } catch(_) {}
-                videoFsName = 'encoded.mp4';
-            }
-        }
-
-        // --- НАРІЗКА ПАУЗ через filter_complex ---
-        dom.ovTitle.innerText = 'Монтаж відео...';
-        dom.ovEta.innerText   = 'ВИРІЗАЄМО ПАУЗИ';
-        setProgress(30);
-
-        // Будуємо filter_complex рядок
-        let filterStr   = '';
+        // Будуємо filter_complex
+        let filterStr    = '';
         let concatInputs = '';
-
         segs.forEach((s, i) => {
-            filterStr += `[0:v]trim=start=${s.s.toFixed(3)}:end=${s.e.toFixed(3)},setpts=PTS-STARTPTS[v${i}];`;
-            filterStr += `[0:a]atrim=start=${s.s.toFixed(3)}:end=${s.e.toFixed(3)},asetpts=PTS-STARTPTS[a${i}];`;
+            filterStr    += `[0:v]trim=start=${s.s.toFixed(3)}:end=${s.e.toFixed(3)},setpts=PTS-STARTPTS[v${i}];`;
+            filterStr    += `[0:a]atrim=start=${s.s.toFixed(3)}:end=${s.e.toFixed(3)},asetpts=PTS-STARTPTS[a${i}];`;
             concatInputs += `[v${i}][a${i}]`;
         });
         filterStr += `${concatInputs}concat=n=${segs.length}:v=1:a=1[ov][oa]`;
 
-        const t0 = Date.now();
+        setupRenderLogger(tOut, Date.now());
 
-        ffmpeg.setLogger(({ message }) => {
-            const m = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
-            if (m && tOut > 0) {
-                const t   = parseInt(m[1]) * 3600 + parseInt(m[2]) * 60 + parseFloat(m[3]);
-                const pct = Math.min(99, 30 + (t / tOut) * 65);
-                setProgress(pct);
-                const elapsed = (Date.now() - t0) / 1000;
-                if (elapsed > 1 && t > 0) {
-                    const eta = Math.round((tOut - t) / (t / elapsed));
-                    if (eta > 0) dom.ovEta.innerText = `Залишилось ~${eta} сек.`;
-                }
-            }
-        });
-
+        // Використовуємо working.mp4 що вже є в FS — не завантажуємо повторно!
         await ffmpeg.run(
-            '-i', videoFsName,
+            '-i', inputFsName,
             '-filter_complex', filterStr,
             '-map', '[ov]',
             '-map', '[oa]',
@@ -505,22 +471,18 @@ dom.btnGo.addEventListener('click', async () => {
             'final.mp4'
         );
 
-        // Читаємо результат
         const data = ffmpeg.FS('readFile', 'final.mp4');
 
-        // Одразу видаляємо всі тимчасові файли з FS
-        for (const n of [videoFsName, 'final.mp4', 'remuxed.mp4', 'encoded.mp4']) {
-            try { ffmpeg.FS('unlink', n); } catch(_) {}
-        }
+        // Одразу звільняємо FS
+        try { ffmpeg.FS('unlink', inputFsName); } catch(_) {}
+        try { ffmpeg.FS('unlink', 'final.mp4');  } catch(_) {}
 
-        const blob = new Blob([data.buffer], { type: 'video/mp4' });
-        const url  = URL.createObjectURL(blob);
-
+        const url = URL.createObjectURL(new Blob([data.buffer], { type: 'video/mp4' }));
         setProgress(100, 'ГОТОВО!');
 
         setTimeout(() => {
-            dom.vPre.src    = url;
-            dom.dl.href     = url;
+            dom.vPre.src         = url;
+            dom.dl.href          = url;
             dom.dl.style.display = 'block';
             hideOverlay();
             dom.sEdit.classList.add('hidden_node');
@@ -530,9 +492,9 @@ dom.btnGo.addEventListener('click', async () => {
     } catch (err) {
         console.error('Render error:', err);
         hideOverlay();
-        alert('Помилка рендерингу:\n\n' + err.message);
+        alert('Помилка рендерингу: ' + err.message);
     } finally {
         dom.btnGo.disabled = false;
         unlock();
     }
-});
+};
