@@ -94,15 +94,16 @@
         .tab_btn {
             flex: 1; text-align: center; padding: 12px; cursor: pointer;
             border-radius: 10px; font-weight: 700; color: #666; transition: 0.2s;
-            user-select: none;
+            user-select: none; -webkit-user-select: none;
         }
         .active_t { background: var(--p-clr); color: white; }
 
         /* ======= КНОПКИ ======= */
         .btn_prim {
-            width: 100%; padding: 18px; border: none; border-radius: 16px;
+            display: block; width: 100%; padding: 18px; border: none; border-radius: 16px;
             background: var(--p-clr); color: white; font-size: 17px; font-weight: bold;
             cursor: pointer; box-shadow: 0 8px 20px rgba(43,108,255,0.3);
+            text-align: center; text-decoration: none;
         }
         .btn_prim:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -110,62 +111,51 @@
         #wv_cvs_11 {
             width: 100%; height: 120px; background: #f5f5f5;
             border-radius: 12px; border: 1px solid #ddd; margin: 15px 0;
+            display: block;
         }
 
-        /* ======= MANUAL CONTROLS ======= */
-        /* Завжди відображається як block — JS перемикає display */
+        /* ======= MANUAL CONTROLS =======
+           Прихований за замовчуванням через inline style="display:none" в HTML.
+           JS перемикає через .style.display — НЕ через hidden_node.
+           Це гарантує роботу в Safari де hidden_node може конфліктувати. */
         #m_cntrls {
             background: #f8f9ff; border: 1px solid #dde5ff; border-radius: 14px;
             padding: 16px 18px; margin-bottom: 14px;
-            /* за замовчуванням прихований — JS покаже при manual */
         }
-        #m_cntrls .ctrl_row {
-            margin-bottom: 16px;
-        }
+        #m_cntrls .ctrl_row { margin-bottom: 18px; }
         #m_cntrls .ctrl_row:last-child { margin-bottom: 0; }
 
         #m_cntrls .ctrl_label {
             display: flex; justify-content: space-between; align-items: center;
-            font-size: 13px; font-weight: 600; color: #444;
-            margin-bottom: 8px;
+            font-size: 14px; font-weight: 600; color: #444; margin-bottom: 10px;
         }
-        #m_cntrls .ctrl_label .val_badge {
+        #m_cntrls .val_badge {
             background: var(--p-clr); color: white;
-            padding: 2px 10px; border-radius: 6px; font-size: 12px; font-weight: 700;
-            min-width: 70px; text-align: center;
+            padding: 3px 10px; border-radius: 8px; font-size: 13px; font-weight: 700;
+            min-width: 75px; text-align: center;
         }
 
-        /* Повзунки — великий thumb для мобільних */
+        /* Великий thumb — зручніше на мобільних */
         #m_cntrls input[type=range] {
-            width: 100%;
-            height: 8px;
-            cursor: pointer;
-            -webkit-appearance: none;
-            appearance: none;
-            background: #dde5ff;
-            border-radius: 4px;
-            outline: none;
+            -webkit-appearance: none; appearance: none;
+            width: 100%; height: 8px; background: #dde5ff;
+            border-radius: 4px; outline: none; cursor: pointer;
             display: block;
         }
         #m_cntrls input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 28px; height: 28px;
-            border-radius: 50%;
-            background: var(--p-clr);
-            cursor: pointer;
-            box-shadow: 0 2px 8px rgba(43,108,255,0.4);
+            -webkit-appearance: none; appearance: none;
+            width: 30px; height: 30px; border-radius: 50%;
+            background: var(--p-clr); cursor: pointer;
+            box-shadow: 0 2px 8px rgba(43,108,255,0.5);
         }
         #m_cntrls input[type=range]::-moz-range-thumb {
-            width: 28px; height: 28px;
-            border-radius: 50%;
-            background: var(--p-clr);
-            cursor: pointer; border: none;
-            box-shadow: 0 2px 8px rgba(43,108,255,0.4);
+            width: 30px; height: 30px; border-radius: 50%;
+            background: var(--p-clr); cursor: pointer; border: none;
+            box-shadow: 0 2px 8px rgba(43,108,255,0.5);
         }
         .rng_row {
             display: flex; justify-content: space-between;
-            font-size: 11px; color: #aaa; margin-top: 4px;
+            font-size: 11px; color: #aaa; margin-top: 5px;
         }
 
         /* ======= AUTO INFO ======= */
@@ -176,7 +166,16 @@
 
         /* ======= PREVIEW ======= */
         .v_pre_cnt { background: #000; border-radius: 12px; margin-bottom: 20px; overflow: hidden; }
-        #vid_pre_77 { width: 100%; display: block; }
+        #vid_pre_77 { width: 100%; display: block; max-height: 60vh; }
+
+        /* ======= DOWNLOAD BUTTON =======
+           Safari не підтримує display:none на <a> через hidden_node коли є href.
+           Тому використовуємо inline style="display:none" і JS встановлює display:block */
+        #dl_btn_99 {
+            margin-bottom: 10px;
+            background: var(--s-clr);
+            box-shadow: 0 8px 20px rgba(0,184,148,0.3);
+        }
 
         footer {
             width: 100%; padding: 40px 20px; text-align: center;
@@ -184,7 +183,6 @@
         }
         footer a { color: #fff; text-decoration: none; font-weight: bold; }
 
-        /* ======= УТИЛІТИ ======= */
         .hidden_node { display: none !important; }
     </style>
 </head>
@@ -269,8 +267,8 @@
         </div>
 
         <!--
-            MANUAL CONTROLS — прихований за замовчуванням через JS (display:none)
-            НЕ через hidden_node, щоб JS міг перемикати display: block / none
+            ВАЖЛИВО: style="display:none" — НЕ hidden_node!
+            JS перемикає через .style.display щоб повзунки точно показувались в Safari.
         -->
         <div id="m_cntrls" style="display:none">
             <div class="ctrl_row">
@@ -305,13 +303,21 @@
     <!-- КРОК 3: РЕЗУЛЬТАТ -->
     <div class="card_main hidden_node" id="step_result">
         <div class="v_pre_cnt">
-            <video id="vid_pre_77" controls playsinline></video>
+            <video id="vid_pre_77" controls playsinline webkit-playsinline></video>
         </div>
-        <a id="dl_btn_99" download="video_ready.mp4"
+
+        <!--
+            display:none через inline style — НЕ hidden_node.
+            JS встановить display:block після рендеру.
+            Safari може ігнорувати hidden_node на <a> з href.
+        -->
+        <a id="dl_btn_99"
+           download="video_ready.mp4"
            class="btn_prim"
-           style="display:none;text-align:center;padding:18px;background:var(--s-clr);color:white;text-decoration:none;border-radius:16px;font-weight:bold;margin-bottom:10px;">
+           style="display:none">
             ⬇ Скачати готовий ролик
         </a>
+
         <button class="btn_prim"
                 style="background:#444;box-shadow:none;margin-top:10px;"
                 onclick="location.reload()">↩ Нове відео</button>
