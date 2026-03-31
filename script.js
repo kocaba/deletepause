@@ -1,298 +1,159 @@
-// =========================
-// ИНИЦИАЛИЗАЦИЯ FFMPEG
-// =========================
 const { createFFmpeg, fetchFile } = FFmpeg;
-const ffmpeg = createFFmpeg({ 
-    log: false, 
-    corePath: './ffmpeg/ffmpeg-core.js' 
-});
+// Важливо: для iPhone краще використовувати стабільну версію з CDN
+const ffmpeg = createFFmpeg({ log: true });
 
-// Состояние приложения
-let audioBufferData = null;
-let cachedRMS = [];
-let audioDuration = 0;
-let sampleRate = 44100;
-let isLoaded = false;
+let aBuffer = null, cRMS = [], aDur = 0, sRate = 44100, isLoaded = false;
 let wakeLock = null;
-let currentMode = 'auto'; // 'auto' или 'manual'
 
-// UI элементы
-const ui = {
-    duration: document.getElementById("duration"),
-    threshold: document.getElementById("threshold"),
-    durationVal: document.getElementById("durationVal"),
-    thresholdVal: document.getElementById("thresholdVal"),
-    processBtn: document.getElementById("processBtn"),
-    progCont: document.getElementById("progCont"),
-    progressBar: document.getElementById("progressBar"),
-    statusText: document.getElementById("statusText"),
-    etaText: document.getElementById("etaText"),
-    downloadBtn: document.getElementById("downloadBtn"),
-    preview: document.getElementById("preview"),
-    autoInfo: document.getElementById("autoInfo"),
-    manualControls: document.getElementById("manualControls"),
-    tabAuto: document.getElementById("tabAuto"),
-    tabManual: document.getElementById("tabManual")
+const dom = {
+    fInp: document.getElementById('real_f'),
+    sFile: document.getElementById('step_file'),
+    sEdit: document.getElementById('step_editor'),
+    sRes: document.getElementById('step_result'),
+    ov: document.getElementById('ov_scr_55'),
+    bar: document.getElementById('p_bar_fill'),
+    ovPct: document.getElementById('ov_pct'),
+    cvs: document.getElementById('wv_cvs_11'),
+    btnGo: document.getElementById('go_proc'),
+    vPre: document.getElementById('vid_pre_77'),
+    dl: document.getElementById('dl_btn_99')
 };
 
-const WINDOW_SIZE = 1024;
+// Блокування сну екрана (важливо для довгих відео на мобільних)
+async function lock() { try { if('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} }
 
-// =========================
-// ПЕРЕКЛЮЧЕНИЕ РЕЖИМОВ (TABS)
-// =========================
-function switchTab(mode) {
-    currentMode = mode;
-    ui.tabAuto.style.background = mode === 'auto' ? '#2b6cff' : 'none';
-    ui.tabAuto.style.color = mode === 'auto' ? 'white' : '#333';
-    ui.tabManual.style.background = mode === 'manual' ? '#2b6cff' : 'none';
-    ui.tabManual.style.color = mode === 'manual' ? 'white' : '#333';
+dom.fInp.onchange = async (e) => {
+    const file = e.target.files[0]; if(!file) return;
     
-    ui.manualControls.style.display = mode === 'manual' ? 'block' : 'none';
-    ui.autoInfo.style.display = mode === 'auto' ? 'block' : 'none';
+    dom.ov.style.display = 'flex';
+    dom.ovPct.innerText = "Аналіз...";
+
+    // Створюємо аудіо контекст після кліку (вимога iOS)
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const aCtx = new AudioContext();
     
-    if (audioBufferData) drawWaveform();
-}
-
-ui.tabAuto.onclick = () => switchTab('auto');
-ui.tabManual.onclick = () => switchTab('manual');
-
-// =========================
-// АЛГОРИТМЫ АНАЛИЗА
-// =========================
-
-// 1. Предварительный расчет громкости (Кэш)
-function precalculateRMS() {
-    cachedRMS = [];
-    for (let i = 0; i < audioBufferData.length; i += WINDOW_SIZE) {
-        let sum = 0;
-        for (let j = 0; j < WINDOW_SIZE; j++) {
-            const s = audioBufferData[i + j] || 0;
-            sum += s * s;
-        }
-        cachedRMS.push(Math.sqrt(sum / WINDOW_SIZE));
-    }
-}
-
-// 2. Автоматический подбор параметров под шум
-function getAutoParams() {
-    if (!cachedRMS.length) return { db: -35, dur: 0.5 };
-
-    // Находим уровень фонового шума (10-й перцентиль самых тихих блоков)
-    const sorted = [...cachedRMS].sort((a, b) => a - b);
-    const noiseLevel = sorted[Math.floor(sorted.length * 0.1)] || 0.001;
-    
-    // Перевод в dB и добавление запаса +8dB над шумом
-    let autoDb = Math.round(20 * Math.log10(noiseLevel + 1e-6) + 8);
-    
-    // Границы разумного
-    if (autoDb < -50) autoDb = -45;
-    if (autoDb > -25) autoDb = -30;
-
-    // Длительность: для длинных видео чуть больше, чтобы не частить
-    let autoDur = audioDuration > 60 ? 0.6 : 0.45;
-
-    return { db: autoDb, dur: autoDur };
-}
-
-// 3. Быстрый поиск пауз (использует кэш)
-function detectSilenceFast(db, minDur) {
-    const limit = Math.pow(10, db / 20);
-    const silences = [];
-    let start = null;
-    const secPerBlock = WINDOW_SIZE / sampleRate;
-
-    for (let i = 0; i < cachedRMS.length; i++) {
-        const time = i * secPerBlock;
-        if (cachedRMS[i] < limit) {
-            if (start === null) start = time;
-        } else if (start !== null) {
-            if (time - start >= minDur) silences.push({ start, end: time });
-            start = null;
-        }
-    }
-    return silences;
-}
-
-// =========================
-// ОТРИСОВКА WAVEFORM
-// =========================
-let renderPending = false;
-function drawWaveform() {
-    if (renderPending || !audioBufferData) return;
-    renderPending = true;
-
-    requestAnimationFrame(() => {
-        const canvas = document.getElementById("waveform");
-        const ctx = canvas.getContext("2d");
-        const w = canvas.width = canvas.offsetWidth;
-        const h = canvas.height = canvas.offsetHeight;
-
-        ctx.clearRect(0, 0, w, h);
+    try {
+        const arrayBuf = await file.arrayBuffer();
+        const dec = await aCtx.decodeAudioData(arrayBuf);
         
-        // Рисуем аудио-волну
-        const step = Math.ceil(audioBufferData.length / w);
-        ctx.fillStyle = "#2b6cff";
-        for (let i = 0; i < w; i++) {
-            let min = 1, max = -1;
-            for (let j = 0; j < step; j++) {
-                const val = audioBufferData[(i * step) + j] || 0;
-                if (val < min) min = val;
-                if (val > max) max = val;
-            }
-            ctx.fillRect(i, (1 + min) * (h/2), 1, Math.max(1, (max - min) * (h/2)));
+        aBuffer = dec.getChannelData(0); 
+        aDur = dec.duration; 
+        sRate = dec.sampleRate;
+
+        // Швидкий розрахунок RMS для візуалізації
+        const s = 2048; cRMS = [];
+        for (let i = 0; i < aBuffer.length; i += s) {
+            let sum = 0; for (let j = 0; j < s; j++) { const v = aBuffer[i+j]||0; sum += v*v; }
+            cRMS.push(Math.sqrt(sum/s));
         }
 
-        // Выбор параметров (Авто или Ручной)
-        let db, dur;
-        if (currentMode === 'auto') {
-            const auto = getAutoParams();
-            db = auto.db; dur = auto.dur;
-            ui.autoInfo.innerText = `✨ Авто: Порог ${db}dB, Мин. тишина ${dur}сек`;
-        } else {
-            db = parseFloat(ui.threshold.value);
-            dur = parseFloat(ui.duration.value);
-        }
-
-        // Рисуем зоны удаления
-        const silences = detectSilenceFast(db, dur);
-        ctx.fillStyle = "rgba(255, 50, 50, 0.4)";
-        silences.forEach(s => {
-            const x1 = (s.start / audioDuration) * w;
-            const x2 = (s.end / audioDuration) * w;
-            ctx.fillRect(x1, 0, x2 - x1, h);
-        });
-        renderPending = false;
-    });
-}
-
-// =========================
-// ЗАГРУЗКА ФАЙЛА
-// =========================
-document.getElementById("fileInput").onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    ui.statusText.innerText = "Декодирование аудио...";
-    ui.progCont.style.display = "block";
-    
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const arrayBuffer = await file.arrayBuffer();
-    const decoded = await audioCtx.decodeAudioData(arrayBuffer);
-
-    audioBufferData = decoded.getChannelData(0);
-    audioDuration = decoded.duration;
-    sampleRate = decoded.sampleRate;
-
-    precalculateRMS();
-    drawWaveform();
-    
-    ui.preview.src = URL.createObjectURL(file);
-    ui.statusText.innerText = "Готово к обработке";
+        dom.sFile.classList.add('hidden_node');
+        dom.sEdit.classList.remove('hidden_node');
+        draw();
+        dom.ov.style.display = 'none';
+    } catch (err) { 
+        alert("iPhone не зміг обробити цей формат. Спробуйте інше відео."); 
+        dom.ov.style.display = 'none'; 
+    }
 };
 
-ui.duration.oninput = () => { ui.durationVal.innerText = ui.duration.value + " сек"; drawWaveform(); };
-ui.threshold.oninput = () => { ui.thresholdVal.innerText = ui.threshold.value + " dB"; drawWaveform(); };
-
-// =========================
-// ГЛАВНЫЙ ПРОЦЕСС РЕНДЕРИНГА
-// =========================
-let totalOutDur = 0;
-let startTime = 0;
-
-ffmpeg.setLogger(({ message }) => {
-    const match = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
-    if (match && totalOutDur > 0) {
-        const time = parseInt(match[1])*3600 + parseInt(match[2])*60 + parseFloat(match[3]);
-        const percent = Math.min(100, (time / totalOutDur) * 100);
-        
-        ui.progressBar.style.width = percent + "%";
-        ui.statusText.innerText = `Обработка: ${percent.toFixed(1)}%`;
-
-        const elapsed = (Date.now() - startTime) / 1000;
-        const eta = Math.round((totalOutDur - time) / (time / elapsed));
-        if (eta > 0) ui.etaText.innerText = `Осталось примерно: ${eta} сек.`;
+function draw() {
+    const ctx = dom.cvs.getContext('2d');
+    dom.cvs.width = dom.cvs.clientWidth; dom.cvs.height = dom.cvs.clientHeight;
+    const w = dom.cvs.width, h = dom.cvs.height;
+    ctx.fillStyle = "#2b6cff";
+    const step = Math.ceil(aBuffer.length / w);
+    for(let i=0; i<w; i++){
+        let max=0;
+        for(let j=0; j<step; j++) {
+            const v = Math.abs(aBuffer[(i*step)+j]||0);
+            if(v > max) max = v;
+        }
+        ctx.fillRect(i, h/2 - (max*h/2), 1, max*h);
     }
-});
+}
 
-ui.processBtn.onclick = async () => {
-    const file = document.getElementById("fileInput").files[0];
-    if (!file || !audioBufferData) return alert("Файл не выбран");
+dom.btnGo.onclick = async () => {
+    const file = dom.fInp.files[0]; if(!file) return;
+    dom.btnGo.disabled = true;
+    await lock();
+    dom.ov.style.display = 'flex';
 
-    ui.processBtn.disabled = true;
-    ui.progCont.style.display = "block";
-    
-    if (!isLoaded) {
-        ui.statusText.innerText = "Загрузка FFmpeg (ожидайте)...";
-        await ffmpeg.load();
-        isLoaded = true;
+    if(!isLoaded) { 
+        dom.ovPct.innerText = "Завантаження ядра...";
+        await ffmpeg.load(); 
+        isLoaded = true; 
     }
 
-    if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
+    // Параметри тиші (автоматичні)
+    const lim = 0.02; // Поріг чутливості
+    const minDur = 0.5; // Мінімальна тиша
+    const sil = []; let st = null; const bT = 2048/sRate;
 
-    // Выбор параметров
-    let db, dur;
-    if (currentMode === 'auto') {
-        const auto = getAutoParams();
-        db = auto.db; dur = auto.dur;
-    } else {
-        db = parseFloat(ui.threshold.value);
-        dur = parseFloat(ui.duration.value);
-    }
-
-    const silences = detectSilenceFast(db, dur);
-    
-    // Формируем сегменты "живого" видео
-    const segments = [];
-    let prev = 0;
-    const PAD = 0.1; // Небольшой отступ для мягкости речи
-    silences.forEach(s => {
-        if (s.start > prev) segments.push({ start: Math.max(0, prev - (prev===0?0:PAD)), end: s.start + PAD });
-        prev = s.end;
+    cRMS.forEach((v, i) => {
+        const t = i * bT;
+        if (v < lim) { if (st === null) st = t; }
+        else if (st !== null) { if (t - st >= minDur) sil.push({st, en: t}); st = null; }
     });
-    if (prev < audioDuration) segments.push({ start: prev - PAD, end: audioDuration });
 
-    totalOutDur = segments.reduce((acc, s) => acc + (s.end - s.start), 0);
+    const segs = []; let prev = 0, PAD = 0.1;
+    sil.forEach(s => {
+        if(s.st > prev) segs.push({s: Math.max(0, prev-(prev===0?0:PAD)), e: s.st+PAD});
+        prev = s.en;
+    });
+    if(prev < aDur) segs.push({s: Math.max(0, prev-PAD), e: aDur});
+
+    const tOut = segs.reduce((a,s)=>a+(s.e-s.s), 0);
     
-    ui.statusText.innerText = "Загрузка видео в память...";
     ffmpeg.FS("writeFile", "in.mp4", await fetchFile(file));
 
-    // Генерация фильтра
-    let filter = "";
-    let concat = "";
-    segments.forEach((s, i) => {
-        filter += `[0:v]trim=start=${s.start.toFixed(3)}:end=${s.end.toFixed(3)},setpts=PTS-STARTPTS[v${i}];`;
-        filter += `[0:a]atrim=start=${s.start.toFixed(3)}:end=${s.end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}];`;
-        concat += `[v${i}][a${i}]`;
+    // Складний фільтр для склейки
+    let f = "", c = "";
+    segs.forEach((s, i) => {
+        f += `[0:v]trim=start=${s.s.toFixed(3)}:end=${s.e.toFixed(3)},setpts=PTS-STARTPTS[v${i}];`;
+        f += `[0:a]atrim=start=${s.s.toFixed(3)}:end=${s.e.toFixed(3)},asetpts=PTS-STARTPTS[a${i}];`;
+        c += `[v${i}][a${i}]`;
     });
-    filter += `${concat}concat=n=${segments.length}:v=1:a=1[ov][oa]`;
+    f += `${c}concat=n=${segs.length}:v=1:a=1[v][a]`;
 
-    startTime = Date.now();
-    ui.progressBar.style.width = "0%";
+    ffmpeg.setLogger(({message}) => {
+        const m = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
+        if(m){
+            const t = parseInt(m[1])*3600+parseInt(m[2])*60+parseFloat(m[3]);
+            const pct = Math.min(100, (t/tOut)*100);
+            dom.bar.style.width = pct+"%";
+            dom.ovPct.innerText = pct.toFixed(0)+"%";
+        }
+    });
 
-    // Запуск FFmpeg с оптимизированными флагами
-    await ffmpeg.run(
-        "-i", "in.mp4",
-        "-filter_complex", filter,
-        "-map", "[ov]", "-map", "[oa]", 
-        "-c:v", "libx264", 
-        "-preset", "ultrafast", 
-        "-crf", "28", 
-        "-c:a", "aac", 
-        "out.mp4"
-    );
+    try {
+        // Використовуємо налаштування для максимальної сумісності з iOS (h264, yuv420p)
+        await ffmpeg.run(
+            "-i", "in.mp4", 
+            "-filter_complex", f, 
+            "-map", "[v]", "-map", "[a]", 
+            "-c:v", "libx264", 
+            "-pix_fmt", "yuv420p",
+            "-profile:v", "baseline",
+            "-level", "3.0",
+            "-preset", "ultrafast", 
+            "-crf", "28",
+            "out.mp4"
+        );
 
-    // Получение результата и очистка RAM
-    const data = ffmpeg.FS("readFile", "out.mp4");
-    ffmpeg.FS("unlink", "in.mp4");
-    ffmpeg.FS("unlink", "out.mp4");
-
-    const url = URL.createObjectURL(new Blob([data.buffer], { type: "video/mp4" }));
-    ui.preview.src = url;
-    ui.downloadBtn.href = url;
-    ui.downloadBtn.style.display = "block";
-    ui.statusText.innerText = "Готово!";
-    ui.etaText.innerText = "Файл обработан успешно";
-    ui.processBtn.disabled = false;
-    
-    if (wakeLock) { wakeLock.release(); wakeLock = null; }
+        const data = ffmpeg.FS("readFile", "out.mp4");
+        const url = URL.createObjectURL(new Blob([data.buffer], {type:"video/mp4"}));
+        
+        dom.vPre.src = url; 
+        dom.dl.href = url; 
+        dom.dl.style.display = "block";
+        dom.ov.style.display = 'none';
+        dom.sEdit.classList.add('hidden_node');
+        dom.sRes.classList.remove('hidden_node');
+    } catch (e) { 
+        alert("Помилка рендерингу. Можливо, файл занадто великий для пам'яті браузера."); 
+        dom.ov.style.display = 'none'; 
+    } finally { 
+        dom.btnGo.disabled = false; 
+    }
 };
