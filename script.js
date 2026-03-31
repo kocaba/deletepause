@@ -4,14 +4,17 @@
 const { createFFmpeg, fetchFile } = FFmpeg;
 const ffmpeg = createFFmpeg({ log: false, corePath: './ffmpeg/ffmpeg-core.js' });
 
-let aBuffer     = null;   // Float32Array — аудіо канал для waveform
-let cRMS        = [];     // RMS по вікнах — для detectSilences
-let aDur        = 0;      // тривалість аудіо (сек)
-let sRate       = 22050;  // частота дискретизації
+let aBuffer     = null;   // Float32Array — аудіо для waveform
+let cRMS        = [];     // RMS кеш для detectSilences
+let aDur        = 0;      // тривалість (сек)
+let sRate       = 22050;
 let isLoaded    = false;
 let cMode       = 'auto';
 let wakeLock    = null;
-let inputFsName = 'working.mp4'; // ім'я відеофайлу в FFmpeg FS — не читаємо назад в JS!
+
+// Ім'я вхідного файлу в FFmpeg FS.
+// Це ЗАВЖДИ оригінальний файл — ніякого перекодування до рендеру!
+let inputFsName = null;
 
 const WINDOW_SIZE = 1024;
 
@@ -51,10 +54,10 @@ function unlock() {
 }
 
 // =========================
-// OVERLAY
+// OVERLAY / ПРОГРЕС
 // =========================
 function showOverlay(title, eta) {
-    dom.ov.style.display = 'flex';
+    dom.ov.style.display  = 'flex';
     dom.ovTitle.innerText = title;
     dom.ovEta.innerText   = eta || '';
     dom.ovPct.innerText   = '';
@@ -76,7 +79,6 @@ function setTab(m) {
     cMode = m;
     document.getElementById('t_auto').classList.toggle('active_t', m === 'auto');
     document.getElementById('t_manual').classList.toggle('active_t', m === 'manual');
-    // Перемикаємо через style.display — надійніше ніж hidden_node для повзунків
     dom.mCntrls.style.display = (m === 'manual') ? 'block' : 'none';
     dom.aInfo.style.display   = (m === 'auto')   ? 'block' : 'none';
     if (aBuffer) drawWaveform();
@@ -85,7 +87,7 @@ document.getElementById('t_auto').onclick   = () => setTab('auto');
 document.getElementById('t_manual').onclick = () => setTab('manual');
 
 // =========================
-// ПОВЗУНКИ — миттєве оновлення waveform
+// ПОВЗУНКИ
 // =========================
 dom.dur.oninput = () => {
     dom.txtDur.innerText = parseFloat(dom.dur.value).toFixed(2) + ' сек';
@@ -101,10 +103,10 @@ dom.db.oninput = () => {
 // =========================
 function getAutoParams() {
     if (!cRMS.length) return { db: -35, dur: 0.5 };
-    const sorted = [...cRMS].sort((a, b) => a - b);
+    const sorted     = [...cRMS].sort((a, b) => a - b);
     const noiseFloor = sorted[Math.floor(sorted.length * 0.1)] || 0.001;
-    let autoDb = Math.round(20 * Math.log10(noiseFloor + 1e-6) + 8);
-    autoDb = Math.min(-25, Math.max(-50, autoDb));
+    let autoDb       = Math.round(20 * Math.log10(noiseFloor + 1e-6) + 8);
+    autoDb           = Math.min(-25, Math.max(-50, autoDb));
     return { db: autoDb, dur: aDur > 60 ? 0.6 : 0.45 };
 }
 
@@ -148,7 +150,6 @@ function drawWaveform() {
 
     ctx.clearRect(0, 0, w, h);
 
-    // Синя хвиля
     const step = Math.max(1, Math.ceil(aBuffer.length / w));
     ctx.fillStyle = '#2b6cff';
     for (let i = 0; i < w; i++) {
@@ -162,7 +163,6 @@ function drawWaveform() {
         ctx.fillRect(i, (1 + mn) * (h / 2), 1, Math.max(1, (mx - mn) * (h / 2)));
     }
 
-    // Параметри
     let db, dur;
     if (cMode === 'auto') {
         const p = getAutoParams();
@@ -173,7 +173,6 @@ function drawWaveform() {
         dur = parseFloat(dom.dur.value);
     }
 
-    // Червоні паузи
     ctx.fillStyle = 'rgba(220, 30, 30, 0.45)';
     detectSilences(db, dur).forEach(s => {
         const x1 = (s.st / aDur) * w;
@@ -183,18 +182,17 @@ function drawWaveform() {
 }
 
 // =========================
-// ВИТЯГТИ АУДІО З FS → DECODE → RMS
+// ВИТЯГТИ ТІЛЬКИ АУДІО → WAV → DECODE → RMS
 //
-// fsInputName — ім'я файлу вже в FFmpeg FS (working.mp4)
-// Витягуємо маленький WAV (~1-3 MB) замість читання всього відео
-// Це ключ до роботи на iPhone без OOM
+// Працює з будь-яким форматом вхідного файлу — MOV, MP4, HEVC тощо.
+// Відео НЕ торкається — тільки аудіодоріжка (-vn).
+// WAV ~1-3 МБ замість 200 МБ → мінімум RAM.
 // =========================
-async function extractAndDecodeAudio(fsInputName) {
+async function extractAndAnalyzeAudio(fsName) {
     dom.ovTitle.innerText = 'Аналіз звуку...';
-    dom.ovEta.innerText   = 'ВИЗНАЧЕННЯ ПАУЗ';
-    setProgress(35);
+    dom.ovEta.innerText   = 'ЧИТАННЯ АУДІОДОРІЖКИ';
+    setProgress(30);
 
-    // Логер для прогресу витягнення аудіо
     ffmpeg.setLogger(({ message }) => {
         const m = message.match(/time=(\d+):(\d+):(\d+\.\d+)/);
         if (m) {
@@ -203,12 +201,13 @@ async function extractAndDecodeAudio(fsInputName) {
         }
     });
 
+    // Витягуємо ТІЛЬКИ аудіо — відео не перекодується взагалі
     await ffmpeg.run(
-        '-i', fsInputName,
-        '-vn',               // тільки аудіо, без відео
-        '-ar', '22050',      // знижена частота — вдвічі менше даних
+        '-i', fsName,
+        '-vn',               // без відео
+        '-ar', '22050',      // знижена частота — достатньо для аналізу, вдвічі менше даних
         '-ac', '1',          // моно
-        '-c:a', 'pcm_s16le', // WAV — Safari декодує без проблем
+        '-c:a', 'pcm_s16le', // WAV без стиснення — швидко декодується Safari
         'audio_only.wav'
     );
 
@@ -218,7 +217,7 @@ async function extractAndDecodeAudio(fsInputName) {
     try { ffmpeg.FS('unlink', 'audio_only.wav'); } catch(_) {}
 
     // Декодуємо через Web Audio API
-    const aCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 22050 });
+    const aCtx   = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 22050 });
     const decoded = await aCtx.decodeAudioData(wavData.buffer);
     if (aCtx.close) aCtx.close();
 
@@ -228,7 +227,7 @@ async function extractAndDecodeAudio(fsInputName) {
 
     setProgress(80);
 
-    // Рахуємо RMS кеш
+    // RMS кеш
     cRMS = [];
     for (let i = 0; i < aBuffer.length; i += WINDOW_SIZE) {
         let sum = 0;
@@ -267,12 +266,11 @@ function setupRenderLogger(totalDur, startMs) {
 // =========================
 // КРОК 1: ЗАВАНТАЖЕННЯ
 //
-// Стратегія (як у версії що працювала на iPhone):
-//   1. Завантажуємо файл у FFmpeg FS
-//   2. Для MOV — remux або encode → working.mp4
-//   3. Витягуємо тільки аудіо для аналізу
-//   4. working.mp4 ЗАЛИШАЄТЬСЯ в FS — не читаємо назад!
-//   5. Рендер на кроці 2 використовує той самий working.mp4 з FS
+// Нова стратегія — НІЧОГО не перекодуємо на цьому кроці:
+//   1. Завантажуємо оригінальний файл у FFmpeg FS як є (MOV або MP4)
+//   2. Витягуємо тільки аудіо → WAV → аналіз
+//   3. Оригінальний файл залишається в FS для кроку 2
+//   4. На кроці 2 — один прохід FFmpeg: remux + нарізка разом
 // =========================
 dom.fInp.onchange = async (e) => {
     const file = e.target.files[0];
@@ -289,88 +287,34 @@ dom.fInp.onchange = async (e) => {
             isLoaded = true;
         }
 
-        // Очищаємо старі файли з FS
-        for (const n of ['tmp_in.mov', 'working.mp4', 'audio_only.wav', 'final.mp4']) {
+        // Очищаємо FS від попередньої сесії
+        for (const n of ['input.mov', 'input.mp4', 'audio_only.wav', 'final.mp4']) {
             try { ffmpeg.FS('unlink', n); } catch(_) {}
         }
 
         const ext   = (file.name.split('.').pop() || 'mp4').toLowerCase();
-        const isMov = ext === 'mov' || file.type === 'video/quicktime' || file.type.includes('quicktime');
+        const isMov = ext === 'mov'
+                   || file.type === 'video/quicktime'
+                   || file.type.includes('quicktime');
 
-        if (isMov) {
-            dom.ovTitle.innerText = 'Завантаження файлу...';
-            dom.ovEta.innerText   = 'ЗАЧЕКАЙТЕ';
-            setProgress(10);
+        // Ім'я файлу в FS зберігає розширення — FFmpeg визначає формат по ньому
+        inputFsName = isMov ? 'input.mov' : 'input.mp4';
 
-            ffmpeg.FS('writeFile', 'tmp_in.mov', await fetchFile(file));
-            setProgress(20);
+        dom.ovTitle.innerText = 'Завантаження файлу...';
+        dom.ovEta.innerText   = 'ЗАЧЕКАЙТЕ';
+        setProgress(10);
 
-            // --- Спроба 1: Remux без перекодування (швидко) ---
-            dom.ovTitle.innerText = 'Підготовка MOV...';
-            dom.ovEta.innerText   = 'КІЛЬКА СЕКУНД';
+        // Записуємо оригінальний файл у FS — БЕЗ ЖОДНОГО ПЕРЕКОДУВАННЯ
+        ffmpeg.FS('writeFile', inputFsName, await fetchFile(file));
+        setProgress(20);
 
-            setupRenderLogger(0, Date.now());
-
-            let remuxOk = false;
-            try {
-                await ffmpeg.run(
-                    '-i', 'tmp_in.mov',
-                    '-c', 'copy',
-                    '-map', '0',
-                    '-movflags', '+faststart',
-                    'working.mp4'
-                );
-                // Перевіряємо що аудіо витягується нормально
-                await extractAndDecodeAudio('working.mp4');
-                remuxOk = true;
-            } catch (err) {
-                console.warn('Remux або аналіз аудіо не вдався, спроба encode:', err);
-                remuxOk = false;
-                try { ffmpeg.FS('unlink', 'working.mp4'); } catch(_) {}
-            }
-
-            // --- Спроба 2: Encode (повільніше, але надійно) ---
-            if (!remuxOk) {
-                dom.ovTitle.innerText = 'Конвертація відео...';
-                dom.ovEta.innerText   = 'ЦЕ ЗАЙМЕ ХВИЛИНУ';
-                setProgress(15);
-
-                setupRenderLogger(0, Date.now());
-
-                await ffmpeg.run(
-                    '-i', 'tmp_in.mov',
-                    '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
-                    '-c:a', 'aac', '-ar', '44100', '-ac', '1',
-                    '-pix_fmt', 'yuv420p',
-                    '-movflags', '+faststart',
-                    'working.mp4'
-                );
-
-                await extractAndDecodeAudio('working.mp4');
-            }
-
-            // MOV більше не потрібен — видаляємо, звільняємо місце
-            try { ffmpeg.FS('unlink', 'tmp_in.mov'); } catch(_) {}
-
-        } else {
-            // MP4 та інші
-            dom.ovTitle.innerText = 'Завантаження файлу...';
-            dom.ovEta.innerText   = 'ЗАЧЕКАЙТЕ';
-            setProgress(10);
-
-            ffmpeg.FS('writeFile', 'working.mp4', await fetchFile(file));
-            setProgress(20);
-
-            await extractAndDecodeAudio('working.mp4');
-        }
-
-        // working.mp4 ЗАЛИШАЄТЬСЯ в FFmpeg FS — рендер на кроці 2 використає його!
-        inputFsName = 'working.mp4';
+        // Витягуємо тільки аудіо для аналізу (відео не чіпаємо)
+        await extractAndAnalyzeAudio(inputFsName);
 
         // Ініціалізуємо повзунки авто-значеннями
         const autoP = getAutoParams();
-        dom.db.value  = autoP.db;
-        dom.dur.value = autoP.dur;
+        dom.db.value         = autoP.db;
+        dom.dur.value        = autoP.dur;
         dom.txtDb.innerText  = autoP.db + ' dB';
         dom.txtDur.innerText = autoP.dur.toFixed(2) + ' сек';
 
@@ -378,13 +322,11 @@ dom.fInp.onchange = async (e) => {
         dom.sFile.classList.add('hidden_node');
         dom.sEdit.classList.remove('hidden_node');
 
-        // Прев'ю: об'єктний URL з оригінального File — браузер стримить з диска,
-        // не займає оперативну пам'ять
+        // Прев'ю — стримінг з диска, не в RAM
         dom.vPre.src = URL.createObjectURL(file);
 
         hideOverlay();
 
-        // Waveform малюємо після того як canvas стане видимим у DOM
         requestAnimationFrame(() => setTimeout(() => drawWaveform(), 80));
 
     } catch (err) {
@@ -395,10 +337,18 @@ dom.fInp.onchange = async (e) => {
 };
 
 // =========================
-// КРОК 2: РЕНДЕР — вирізаємо паузи
+// КРОК 2: РЕНДЕР
 //
-// working.mp4 вже є в FFmpeg FS з кроку 1 — НЕ завантажуємо знову!
-// Це ключ: на iPhone немає подвоєння файлу в RAM
+// Один прохід FFmpeg — ніякого попереднього перекодування.
+//
+// Для MOV: FFmpeg сам конвертує під час нарізки.
+// Ми передаємо оригінальний input.mov напряму у filter_complex.
+// Це означає ONE encode pass замість двох.
+//
+// Схема пам'яті:
+//   - input.mov в FS (оригінал, без дублів)
+//   - final.mp4 в FS (результат)
+//   - Жодних проміжних файлів
 // =========================
 dom.btnGo.onclick = async () => {
     if (!aBuffer || !inputFsName) return;
@@ -419,22 +369,17 @@ dom.btnGo.onclick = async () => {
 
         const silences = detectSilences(db, dur);
 
-        // Будуємо сегменти для збереження
         const PAD  = 0.1;
         const segs = [];
-        let prev = 0;
+        let prev   = 0;
 
         silences.forEach(s => {
             const segStart = Math.max(0, prev === 0 ? 0 : prev - PAD);
             const segEnd   = Math.min(aDur, s.st + PAD);
-            if (segEnd > segStart + 0.05) {
-                segs.push({ s: segStart, e: segEnd });
-            }
+            if (segEnd > segStart + 0.05) segs.push({ s: segStart, e: segEnd });
             prev = s.en;
         });
-        if (prev < aDur) {
-            segs.push({ s: Math.max(0, prev - PAD), e: aDur });
-        }
+        if (prev < aDur) segs.push({ s: Math.max(0, prev - PAD), e: aDur });
 
         if (segs.length === 0) {
             alert('Пауз не знайдено! Спробуйте знизити поріг тиші в ручному режимі.');
@@ -458,7 +403,10 @@ dom.btnGo.onclick = async () => {
 
         setupRenderLogger(tOut, Date.now());
 
-        // Використовуємо working.mp4 що вже є в FS — не завантажуємо повторно!
+        // ОДИН ПРОХІД: читаємо оригінальний файл (MOV або MP4) напряму,
+        // нарізаємо паузи і кодуємо в MP4 за один раз.
+        // Для MOV H.264 — FFmpeg remux + encode відбувається тут, один раз.
+        // Для MOV HEVC — те ж саме, libx264 перекодовує один раз.
         await ffmpeg.run(
             '-i', inputFsName,
             '-filter_complex', filterStr,
@@ -473,7 +421,7 @@ dom.btnGo.onclick = async () => {
 
         const data = ffmpeg.FS('readFile', 'final.mp4');
 
-        // Одразу звільняємо FS
+        // Очищаємо FS одразу
         try { ffmpeg.FS('unlink', inputFsName); } catch(_) {}
         try { ffmpeg.FS('unlink', 'final.mp4');  } catch(_) {}
 
