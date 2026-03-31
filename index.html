@@ -2,113 +2,59 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pause Remover Pro - iPhone Fixed</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pause Remover Pro - WebProgger</title>
     <style>
-        :root { --p-clr: #2b6cff; --s-clr: #00b894; --b-clr: #050505; }
-        * { box-sizing: border-box; }
+        :root { --p-clr: #2b6cff; --s-clr: #00b894; --b-clr: #050505; --err-clr: rgba(255, 50, 50, 0.5); }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { 
             margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
             background: var(--b-clr); color: #fff; min-height: 100vh;
             display: flex; flex-direction: column; align-items: center;
-            padding-top: 120px; overflow-x: hidden;
+            padding-top: 100px; overflow-x: hidden;
         }
+        .bg_anim { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background: #000; }
+        .blob { position: absolute; width: 500px; height: 500px; background: radial-gradient(circle, rgba(43,108,255,0.4) 0%, rgba(0,0,0,0) 70%); border-radius: 50%; filter: blur(60px); animation: move 8s infinite alternate; }
+        @keyframes move { 0% { transform: translate(-20%, -20%); } 100% { transform: translate(40%, 30%); } }
 
-        .bg_anim {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            z-index: -1; overflow: hidden; background: #000;
-        }
-        .blob {
-            position: absolute; width: 500px; height: 500px;
-            background: radial-gradient(circle, rgba(43,108,255,0.4) 0%, rgba(0,0,0,0) 70%);
-            border-radius: 50%; filter: blur(60px);
-            animation: move 8s infinite alternate ease-in-out;
-        }
-        .blob-2 {
-            width: 400px; height: 400px; left: 60%; top: 40%;
-            background: radial-gradient(circle, rgba(30,58,138,0.5) 0%, rgba(0,0,0,0) 70%);
-            animation-duration: 6s; animation-delay: -2s;
-        }
-        @keyframes move {
-            0% { transform: translate(-20%, -20%) scale(1); }
-            100% { transform: translate(40%, 30%) scale(1.3); }
-        }
-
-        header div.f_head {
-            padding-top: 16px; width: 100%; min-height: 75px; position: fixed; 
-            top: 0; left: 0; z-index: 999999; background: rgba(255,255,255,0.95); 
-            backdrop-filter: blur(10px); border-bottom: 1px solid #ddd;
-        }
-
-        .main_app_v3 { width: 100%; max-width: 600px; padding: 0 20px; z-index: 10; flex: 1; }
+        header div.f_head { padding-top: 10px; width: 100%; min-height: 70px; position: fixed; top: 0; left: 0; z-index: 999; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-bottom: 1px solid #ddd; }
+        .main_app_v3 { width: 100%; max-width: 600px; padding: 0 15px; z-index: 10; }
+        .card_main { background: #fff; border-radius: 24px; padding: 25px; margin-bottom: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); color: #333; }
+        h2 { text-align: center; margin-top: 0; color: var(--p-clr); }
         
-        .card_main { 
-            background: #fff; border-radius: 24px; padding: 30px; 
-            margin-bottom: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); color: #333;
-        }
-        h2 { text-align: center; margin-top: 0; color: var(--p-clr); font-size: 26px; font-weight: 800; }
+        .f_inp_88 { width: 100%; padding: 40px 20px; border: 3px dashed #e0e0e0; border-radius: 16px; cursor: pointer; text-align: center; color: #888; }
         
-        .f_inp_88 { 
-            width: 100%; padding: 60px 20px; border: 3px dashed #e0e0e0; border-radius: 16px; 
-            cursor: pointer; background: #f9f9f9; text-align: center; font-weight: bold; 
-            transition: 0.3s; color: #888; font-size: 18px;
-        }
-        .f_inp_88:hover { border-color: var(--p-clr); color: var(--p-clr); background: #f0f5ff; }
-
-        #ov_scr_55 {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.98); z-index: 9999999; flex-direction: column;
-            justify-content: center; align-items: center; color: white;
-        }
-        .p_bar_bg { width: 80%; max-width: 400px; height: 10px; background: #222; border-radius: 5px; overflow: hidden; margin: 25px 0; }
-        #p_bar_fill { width: 0%; height: 100%; background: var(--p-clr); box-shadow: 0 0 15px var(--p-clr); }
+        #ov_scr_55 { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 10000; flex-direction: column; justify-content: center; align-items: center; color: white; }
+        .p_bar_bg { width: 80%; height: 10px; background: #222; border-radius: 5px; margin: 20px 0; }
+        #p_bar_fill { width: 0%; height: 100%; background: var(--p-clr); transition: 0.2s; }
         
         .tabs_row { display: flex; background: #f0f0f0; border-radius: 12px; padding: 5px; margin-bottom: 20px; }
-        .tab_btn { flex: 1; text-align: center; padding: 12px; cursor: pointer; border-radius: 10px; font-weight: 700; color: #666; }
+        .tab_btn { flex: 1; text-align: center; padding: 12px; cursor: pointer; border-radius: 10px; font-weight: bold; color: #666; }
         .active_t { background: var(--p-clr); color: white; }
         
-        .btn_prim { 
-            width: 100%; padding: 18px; border: none; border-radius: 16px; 
-            background: var(--p-clr); color: white; font-size: 17px; font-weight: bold; 
-            cursor: pointer; box-shadow: 0 8px 20px rgba(43,108,255,0.3);
-        }
-        
-        #wv_cvs_11 { width: 100%; height: 120px; background: #fff; border-radius: 12px; border: 1px solid #ddd; margin: 15px 0; }
+        #wv_cvs_11 { width: 100%; height: 150px; background: #f9f9f9; border-radius: 12px; border: 1px solid #ddd; margin: 15px 0; }
+        .btn_prim { width: 100%; padding: 18px; border: none; border-radius: 16px; background: var(--p-clr); color: white; font-size: 17px; font-weight: bold; cursor: pointer; }
         .hidden_node { display: none !important; }
+        label { font-weight: bold; font-size: 14px; display: block; margin-top: 10px; }
+        input[type=range] { width: 100%; margin: 10px 0; }
     </style>
 </head>
 <body>
 
-<div class="bg_anim">
-    <div class="blob"></div>
-    <div class="blob blob-2"></div>
-</div>
-
-<header>
-    <div class="f_head">
-        <div style="width:95%;max-width:1200px;margin:0 auto;padding:10px 15px;display:flex;justify-content:space-between;align-items:flex-start;">
-            <div style="display:flex;flex-direction:column;line-height:1.2;">
-                <span style="font-size:20px;font-weight:bold;color:#000">Web<span style="color:darkblue">Progger</span></span>
-                <div style="font-size:14px;color:#444">Pause Remover Pro</div>
-            </div>
-        </div>
-    </div>
-</header>
-
 <div id="ov_scr_55">
-    <h2 style="color:white" id="ov_title">Підготовка...</h2>
-    <div id="ov_pct" style="font-size: 60px; font-weight: 900; color: var(--p-clr);">0%</div>
+    <h2 style="color:white" id="ov_title">Обробка...</h2>
+    <div id="ov_pct" style="font-size: 50px; font-weight: 900; color: var(--p-clr);">0%</div>
     <div class="p_bar_bg"><div id="p_bar_fill"></div></div>
-    <div id="ov_eta" style="opacity: 0.6; letter-spacing: 1px;">ЗАЧЕКАЙТЕ, БУДЬ ЛАСКА</div>
+    <div id="ov_eta">Зачекайте, будь ласка</div>
 </div>
 
 <div class="main_app_v3">
     <div id="step_file">
         <div class="card_main">
-            <h2>Завантажити Відео</h2>
+            <h2>Pause Remover Pro</h2>
             <div class="f_inp_88" onclick="document.getElementById('real_f').click()">
-                <div style="font-size:40px; margin-bottom:10px;">📱</div>
-                Виберіть файл (підтримується iPhone MOV)
+                <div style="font-size:40px;">📁</div>
+                Завантажити відео
                 <input type="file" id="real_f" accept="video/*" style="display:none">
             </div>
         </div>
@@ -116,22 +62,28 @@
 
     <div class="card_main hidden_node" id="step_editor">
         <div class="tabs_row">
-            <div id="t_auto" class="tab_btn active_t">Авто-режим</div>
+            <div id="t_auto" class="tab_btn active_t">Авто</div>
             <div id="t_manual" class="tab_btn">Ручна настройка</div>
         </div>
+
         <div id="m_cntrls" class="hidden_node">
-            <label>Поріг тиші (dB): <span id="txt_db">-35 dB</span></label>
-            <input type="range" id="val_db" min="-60" max="-10" step="1" value="-35" style="width:100%">
+            <label>Мінімальна пауза: <span id="txt_dur">0.5</span> сек</label>
+            <input type="range" id="val_dur" min="0.1" max="2.0" step="0.05" value="0.5">
+            
+            <label>Поріг шуму: <span id="txt_db">-35</span> dB</label>
+            <input type="range" id="val_db" min="-60" max="-10" step="1" value="-35">
         </div>
-        <div id="a_info">✨ Розумний підбір параметрів активовано.</div>
+        
+        <div id="a_info" style="font-size: 13px; color: #666; margin-bottom:10px;">✨ Параметри підібрано автоматично</div>
+        
         <canvas id="wv_cvs_11"></canvas>
         <button id="go_proc" class="btn_prim">Вирізати паузи</button>
     </div>
 
     <div class="card_main hidden_node" id="step_result">
         <video id="vid_pre_77" controls style="width:100%; border-radius:12px;"></video>
-        <a id="dl_btn_99" download="video_fixed.mp4" class="btn_prim" style="display:none; text-align:center; margin-top:15px; background:var(--s-clr); text-decoration:none;">Скачати MP4</a>
-        <button class="btn_prim" style="background:#444; margin-top:10px;" onclick="location.reload()">Новий файл</button>
+        <a id="dl_btn_99" download="result.mp4" class="btn_prim" style="display:block; text-decoration:none; text-align:center; background:var(--s-clr); margin: 15px 0;">Скачати відео</a>
+        <button class="btn_prim" style="background:#666;" onclick="location.reload()">Інше відео</button>
     </div>
 </div>
 
