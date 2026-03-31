@@ -2,39 +2,36 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pause Remover Pro - Mobile Ready</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pause Remover Pro - WebProgger</title>
     <style>
         :root { --p-clr: #2b6cff; --s-clr: #00b894; --b-clr: #050505; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        * { box-sizing: border-box; }
         body { 
-            margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
             background: var(--b-clr); color: #fff; min-height: 100vh;
             display: flex; flex-direction: column; align-items: center;
-            padding-top: 80px; overflow-x: hidden;
+            padding-top: 120px; overflow-x: hidden;
         }
-
         .bg_anim { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background: #000; }
-        .blob { position: absolute; width: 300px; height: 300px; background: radial-gradient(circle, rgba(43,108,255,0.3) 0%, rgba(0,0,0,0) 70%); border-radius: 50%; filter: blur(50px); animation: move 10s infinite alternate; }
-        @keyframes move { 0% { transform: translate(-10%, -10%); } 100% { transform: translate(30%, 20%); } }
-
-        header .f_head { width: 100%; position: fixed; top: 0; background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); z-index: 100; border-bottom: 1px solid #ddd; padding: 10px 0; }
-        .main_app_v3 { width: 100%; max-width: 500px; padding: 15px; z-index: 10; }
-        
-        .card_main { background: #fff; border-radius: 20px; padding: 20px; margin-bottom: 20px; color: #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        h2 { text-align: center; margin: 0 0 15px 0; color: var(--p-clr); font-size: 22px; }
-        
-        .f_inp_88 { width: 100%; padding: 40px 15px; border: 2px dashed #ccc; border-radius: 15px; text-align: center; cursor: pointer; color: #777; font-weight: bold; }
-        
-        #ov_scr_55 { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 200; flex-direction: column; justify-content: center; align-items: center; }
-        .p_bar_bg { width: 80%; height: 8px; background: #333; border-radius: 4px; margin: 20px 0; overflow: hidden; }
-        #p_bar_fill { width: 0%; height: 100%; background: var(--p-clr); transition: width 0.3s; }
-
-        .btn_prim { width: 100%; padding: 16px; border: none; border-radius: 12px; background: var(--p-clr); color: white; font-size: 16px; font-weight: bold; cursor: pointer; }
-        #wv_cvs_11 { width: 100%; height: 100px; background: #f0f0f0; border-radius: 10px; margin: 15px 0; }
-        
+        .blob { position: absolute; width: 500px; height: 500px; background: radial-gradient(circle, rgba(43,108,255,0.4) 0%, rgba(0,0,0,0) 70%); border-radius: 50%; filter: blur(60px); animation: move 8s infinite alternate ease-in-out; }
+        @keyframes move { 0% { transform: translate(-20%, -20%) scale(1); } 100% { transform: translate(40%, 30%) scale(1.3); } }
+        header div.f_head { padding-top: 16px; width: 100%; min-height: 75px; position: fixed; top: 0; left: 0; z-index: 999999; background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); border-bottom: 1px solid #ddd; }
+        .main_app_v3 { width: 100%; max-width: 600px; padding: 0 20px; z-index: 10; flex: 1; }
+        .card_main { background: #fff; border-radius: 24px; padding: 30px; margin-bottom: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); color: #333; }
+        h2 { text-align: center; margin-top: 0; color: var(--p-clr); font-size: 26px; font-weight: 800; }
+        .f_inp_88 { width: 100%; padding: 60px 20px; border: 3px dashed #e0e0e0; border-radius: 16px; cursor: pointer; background: #f9f9f9; text-align: center; font-weight: bold; transition: 0.3s; color: #888; font-size: 18px; }
+        .f_inp_88:hover { border-color: var(--p-clr); color: var(--p-clr); background: #f0f5ff; }
+        #ov_scr_55 { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.98); z-index: 9999999; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 20px; }
+        .p_bar_bg { width: 80%; max-width: 400px; height: 10px; background: #222; border-radius: 5px; overflow: hidden; margin: 25px 0; }
+        #p_bar_fill { width: 0%; height: 100%; background: var(--p-clr); transition: 0.3s; }
+        .tabs_row { display: flex; background: #f0f0f0; border-radius: 12px; padding: 5px; margin-bottom: 20px; }
+        .tab_btn { flex: 1; text-align: center; padding: 12px; cursor: pointer; border-radius: 10px; font-weight: 700; color: #666; }
+        .active_t { background: var(--p-clr); color: white; }
+        .btn_prim { width: 100%; padding: 18px; border: none; border-radius: 16px; background: var(--p-clr); color: white; font-size: 17px; font-weight: bold; cursor: pointer; }
+        #wv_cvs_11 { width: 100%; height: 120px; background: #fff; border-radius: 12px; border: 1px solid #ddd; margin: 15px 0; }
         .hidden_node { display: none !important; }
-        video { width: 100%; border-radius: 12px; background: #000; }
+        #log_box { margin-top: 15px; font-size: 12px; color: #ff4757; text-align: center; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -43,15 +40,18 @@
 
 <header>
     <div class="f_head">
-        <div style="text-align:center; font-weight:bold; color:#000;">Web<span style="color:darkblue">Progger</span> AI</div>
+        <div style="width:95%;max-width:1200px;margin:0 auto;padding:10px 15px;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:20px;font-weight:bold;color:#000">Web<span style="color:darkblue">Progger</span></span>
+            <div style="font-size:14px;color:#444">iPhone MOV Support Edition</div>
+        </div>
     </div>
 </header>
 
 <div id="ov_scr_55">
-    <h2 style="color:white">Обробка відео...</h2>
-    <div id="ov_pct" style="font-size: 40px; font-weight: bold; color: var(--p-clr);">0%</div>
+    <h2 style="color:white" id="ov_title">Обробка...</h2>
+    <div id="ov_pct" style="font-size: 60px; font-weight: 900; color: var(--p-clr);">0%</div>
     <div class="p_bar_bg"><div id="p_bar_fill"></div></div>
-    <div style="color:#aaa; font-size:12px;">НЕ ЗАКРИВАЙТЕ ВКЛАДКУ</div>
+    <div id="ov_eta">Зачекайте, адаптуємо формат відео</div>
 </div>
 
 <div class="main_app_v3">
@@ -59,29 +59,35 @@
         <div class="card_main">
             <h2>Pause Remover Pro</h2>
             <div class="f_inp_88" onclick="document.getElementById('real_f').click()">
-                <div style="font-size:30px;">📱</div>
-                Обрати відео з iPhone
+                <div style="font-size:40px; margin-bottom:10px;">📱</div>
+                Завантажити (MP4 або MOV з iPhone)
                 <input type="file" id="real_f" accept="video/*" style="display:none">
             </div>
+            <div id="log_box"></div>
         </div>
     </div>
 
     <div class="card_main hidden_node" id="step_editor">
-        <canvas id="wv_cvs_11"></canvas>
-        <div style="margin-bottom:15px; font-size:14px; color:#666;">
-            Алгоритм автоматично видалить паузи, де ви мовчите або читаєте текст.
+        <div class="tabs_row">
+            <div id="t_auto" class="tab_btn active_t">Авто-режим</div>
+            <div id="t_manual" class="tab_btn">Настройка</div>
         </div>
-        <button id="go_proc" class="btn_prim">Почати монтаж</button>
+        <div id="m_cntrls" class="hidden_node">
+            <input type="range" id="val_dur" min="0.1" max="2.0" step="0.05" value="0.5">
+            <input type="range" id="val_db" min="-60" max="-10" step="1" value="-35">
+        </div>
+        <canvas id="wv_cvs_11"></canvas>
+        <button id="go_proc" class="btn_prim">Запустити монтаж</button>
     </div>
 
     <div class="card_main hidden_node" id="step_result">
-        <video id="vid_pre_77" controls playsinline></video>
-        <a id="dl_btn_99" download="iphone_ready.mp4" style="display:none; text-align:center; padding:16px; background:var(--s-clr); color:white; text-decoration:none; border-radius:12px; font-weight:bold; margin: 15px 0; display:block;">Зберегти у Фото</a>
-        <button class="btn_prim" style="background:#666;" onclick="location.reload()">Інше відео</button>
+        <video id="vid_pre_77" controls style="width:100%; border-radius:12px;"></video>
+        <a id="dl_btn_99" download="video_ready.mp4" style="display:none; text-align:center; padding:18px; background:var(--s-clr); color:white; text-decoration:none; border-radius:16px; font-weight:bold; margin-top:20px;">Скачати відео</a>
+        <button class="btn_prim" style="background:#444; margin-top:10px;" onclick="location.reload()">Нове відео</button>
     </div>
 </div>
 
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.10.1/dist/ffmpeg.min.js"></script>
+<script src="./ffmpeg/ffmpeg.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
