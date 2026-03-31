@@ -412,7 +412,7 @@ dom.btnGo.onclick = async () => {
             '-filter_complex', filterStr,
             '-map', '[ov]',
             '-map', '[oa]',
-            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23',
+            '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '25',
             '-pix_fmt', 'yuv420p',
             '-c:a', 'aac',
             '-movflags', '+faststart',
